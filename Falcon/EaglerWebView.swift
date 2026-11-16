@@ -1,9 +1,10 @@
 import SwiftUI
 import WebKit
 
-/// Immersive wrapper that loads the bundled Eaglet client from the app bundle.
-/// Uses Bundle.main.url(forResource:"Eaglet", withExtension:"html") and loadFileURL(_:allowingReadAccessTo:).
+/// Immersive wrapper that loads a selected bundled client in a browser-chrome-free WKWebView.
 struct EaglerWebView: UIViewRepresentable {
+    let fileURL: URL
+
     func makeUIView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.allowsInlineMediaPlayback = true
@@ -27,16 +28,16 @@ struct EaglerWebView: UIViewRepresentable {
         }
         #endif
 
-        loadBundledGame(in: webView)
+        loadSelectedClient(in: webView)
         return webView
     }
 
     func updateUIView(_ uiView: WKWebView, context: Context) {}
 
-    private func loadBundledGame(in webView: WKWebView) {
-        guard let fileURL = Bundle.main.url(forResource: "Eaglet", withExtension: "html") else {
-            assertionFailure("Missing bundled resource: Eaglet.html")
-            let message = "<html><body style='background:#000;color:#fff;font-family:-apple-system'>Missing bundled Eaglet.html</body></html>"
+    private func loadSelectedClient(in webView: WKWebView) {
+        guard FileManager.default.fileExists(atPath: fileURL.path) else {
+            assertionFailure("Missing bundled resource: \(fileURL.lastPathComponent)")
+            let message = "<html><body style='background:#000;color:#fff;font-family:-apple-system'>Missing bundled client: \(fileURL.lastPathComponent)</body></html>"
             webView.loadHTMLString(message, baseURL: nil)
             return
         }
