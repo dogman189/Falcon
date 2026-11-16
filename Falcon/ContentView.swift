@@ -8,10 +8,48 @@
 import SwiftUI
 
 struct ContentView: View {
+    @State private var selectedClient: BundledClient?
+
     var body: some View {
-        EaglerWebView()
-            .ignoresSafeArea()
-            .background(.black)
+        Group {
+            if let selectedClient, let fileURL = selectedClient.url {
+                EaglerWebView(fileURL: fileURL)
+                    .ignoresSafeArea()
+                    .background(.black)
+            } else {
+                clientSelector
+            }
+        }
+    }
+
+    private var clientSelector: some View {
+        NavigationStack {
+            List {
+                Section {
+                    ForEach(BundledClient.all) { client in
+                        Button {
+                            selectedClient = client
+                        } label: {
+                            HStack {
+                                Text(client.name)
+                                    .foregroundStyle(.primary)
+                                Spacer()
+                                if client.url == nil {
+                                    Image(systemName: "exclamationmark.triangle")
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        .disabled(client.url == nil)
+                    }
+                } header: {
+                    Text("Select a client")
+                } footer: {
+                    Text("The selected client opens full screen. Quit and reopen Falcon to return to this list.")
+                }
+            }
+            .navigationTitle("Falcon")
+        }
     }
 }
 
