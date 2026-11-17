@@ -30,14 +30,14 @@ struct ContentView: View {
             selectedClient = nil
         } label: {
             Text("Quit")
-                .font(.headline)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                .font(.subheadline.weight(.semibold))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
         }
-        .background(Color.black.opacity(0.45))
+        .background(Color.black.opacity(0.25))
         .clipShape(Capsule())
-        .foregroundStyle(.white)
-        .padding(.leading, 12)
+        .foregroundStyle(.white.opacity(0.9))
+        .padding(.leading, 24)
         .padding(.top, 8)
     }
 
