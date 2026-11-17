@@ -4,16 +4,38 @@ struct BundledClient: Identifiable, Hashable {
     let name: String
     let resource: String
     let fileExtension: String
+    var query: String?
+    var fragment: String?
+    var note: String?
 
     var id: String { resource }
 
     var url: URL? {
-        Bundle.main.url(forResource: resource, withExtension: fileExtension)
+        guard let baseURL = Bundle.main.url(forResource: resource, withExtension: fileExtension) else {
+            return nil
+        }
+        guard var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else {
+            return baseURL
+        }
+        if let query, !query.isEmpty {
+            components.percentEncodedQuery = query
+        }
+        if let fragment, !fragment.isEmpty {
+            components.percentEncodedFragment = fragment
+        }
+        return components.url ?? baseURL
     }
 
     static let all: [BundledClient] = [
         BundledClient(name: "Eaglet", resource: "Eaglet", fileExtension: "html"),
         BundledClient(name: "1.8.8-wasm", resource: "1.8.8-wasm", fileExtension: "html"),
-        BundledClient(name: "26.2-wasm", resource: "26.2-wasm", fileExtension: "html"),
+        BundledClient(
+            name: "26.2-wasm",
+            resource: "26.2-wasm",
+            fileExtension: "html",
+            query: "nomesh&chunkunload=capped",
+            fragment: "nopre=1",
+            note: "Low-memory mode"
+        ),
     ]
 }
