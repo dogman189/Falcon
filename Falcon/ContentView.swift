@@ -16,10 +16,29 @@ struct ContentView: View {
                 EaglerWebView(fileURL: fileURL)
                     .ignoresSafeArea()
                     .background(.black)
+                    .overlay(alignment: .topLeading) {
+                        quitButton
+                    }
             } else {
                 clientSelector
             }
         }
+    }
+
+    private var quitButton: some View {
+        Button {
+            selectedClient = nil
+        } label: {
+            Text("Quit")
+                .font(.headline)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+        }
+        .background(Color.black.opacity(0.45))
+        .clipShape(Capsule())
+        .foregroundStyle(.white)
+        .padding(.leading, 12)
+        .padding(.top, 8)
     }
 
     private var clientSelector: some View {
