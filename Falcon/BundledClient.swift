@@ -34,5 +34,7 @@ struct BundledClient: Identifiable, Hashable {
             fileExtension: "html",
             note: "If stuck on integrated server, cancel and run single-thread"
         ),
+        BundledClient(name: "1.12.2-wasm", resource: "1.12.2-wasm", fileExtension: "html"),
+        BundledClient(name: "1.21.11-wasm", resource: "1.21.11-wasm", fileExtension: "html"),
     ]
 }
