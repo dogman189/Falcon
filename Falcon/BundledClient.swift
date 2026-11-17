@@ -28,7 +28,12 @@ struct BundledClient: Identifiable, Hashable {
 
     static let all: [BundledClient] = [
         BundledClient(name: "Eaglet", resource: "Eaglet", fileExtension: "html"),
-        BundledClient(name: "1.8.8-wasm", resource: "1.8.8-wasm", fileExtension: "html"),
+        BundledClient(
+            name: "1.8.8-wasm",
+            resource: "1.8.8-wasm",
+            fileExtension: "html",
+            note: "If stuck on integrated server, cancel and run single-thread"
+        ),
         BundledClient(
             name: "26.2-wasm",
             resource: "26.2-wasm",
