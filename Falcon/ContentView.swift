@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var selectedClient: BundledClient?
+    @State private var quitRevealed = false
 
     var body: some View {
         Group {
@@ -17,7 +18,24 @@ struct ContentView: View {
                     .ignoresSafeArea()
                     .background(.black)
                     .overlay(alignment: .topLeading) {
-                        quitButton
+                        ZStack(alignment: .topLeading) {
+                            Color.clear
+                                .frame(width: 140, height: 90)
+                                .contentShape(Rectangle())
+                                .gesture(
+                                    DragGesture(minimumDistance: 20)
+                                        .onEnded { _ in
+                                            quitRevealed = true
+                                        }
+                                )
+
+                            if quitRevealed {
+                                quitButton
+                            }
+                        }
+                    }
+                    .onChange(of: selectedClient) { _, _ in
+                        quitRevealed = false
                     }
             } else {
                 clientSelector
