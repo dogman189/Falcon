@@ -10,6 +10,7 @@ import SwiftUI
 struct ContentView: View {
     @State private var selectedClient: BundledClient?
     @State private var quitRevealed = false
+    @State private var quitHideTask: Task<Void, Never>?
 
     var body: some View {
         Group {
@@ -25,7 +26,7 @@ struct ContentView: View {
                                 .gesture(
                                     DragGesture(minimumDistance: 20)
                                         .onEnded { _ in
-                                            quitRevealed = true
+                                            toggleQuitReveal()
                                         }
                                 )
 
@@ -34,17 +35,18 @@ struct ContentView: View {
                             }
                         }
                     }
-                    .onChange(of: selectedClient) { _, _ in
-                        quitRevealed = false
-                    }
             } else {
                 clientSelector
             }
+        }
+        .onChange(of: selectedClient) { _, _ in
+            hideQuit()
         }
     }
 
     private var quitButton: some View {
         Button {
+            hideQuit()
             selectedClient = nil
         } label: {
             Text("Quit")
@@ -57,6 +59,34 @@ struct ContentView: View {
         .foregroundStyle(.white.opacity(0.9))
         .padding(.leading, 24)
         .padding(.top, 8)
+    }
+
+    private func toggleQuitReveal() {
+        withAnimation(.easeInOut(duration: 0.15)) {
+            quitRevealed.toggle()
+        }
+        if quitRevealed {
+            scheduleQuitAutoHide()
+        } else {
+            quitHideTask?.cancel()
+        }
+    }
+
+    private func scheduleQuitAutoHide() {
+        quitHideTask?.cancel()
+        quitHideTask = Task {
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeInOut(duration: 0.15)) {
+                quitRevealed = false
+            }
+        }
+    }
+
+    private func hideQuit() {
+        quitHideTask?.cancel()
+        quitHideTask = nil
+        quitRevealed = false
     }
 
     private var clientSelector: some View {
