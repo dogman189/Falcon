@@ -34,13 +34,5 @@ struct BundledClient: Identifiable, Hashable {
             fileExtension: "html",
             note: "If stuck on integrated server, cancel and run single-thread"
         ),
-        BundledClient(
-            name: "26.2-wasm",
-            resource: "26.2-wasm",
-            fileExtension: "html",
-            query: "nomesh&chunkunload=capped",
-            fragment: "nopre=1",
-            note: "Low-memory mode"
-        ),
     ]
 }

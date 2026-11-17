@@ -66,8 +66,7 @@ struct EaglerWebView: UIViewRepresentable {
             report("""
             This client ran out of memory and iOS stopped it.
 
-            26.2 is very large and may exceed the memory limit on this iPhone. \
-            Try 1.8.8-wasm or Eaglet, or reopen 26.2 in low-memory mode.
+            Try the other bundled client, or reopen this one and use lower-memory options if available.
             """)
         }
 

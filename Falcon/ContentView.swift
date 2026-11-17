@@ -170,7 +170,7 @@ struct ContentView: View {
                 } header: {
                     Text("Select a client")
                 } footer: {
-                    Text("Swipe down in the top-left corner to reveal Quit. 26.2 runs in low-memory mode but may still be stopped by iOS; 1.8.8-wasm may need single-thread if it hangs starting the integrated server.")
+                    Text("Swipe down in the top-left corner to reveal Quit. 1.8.8-wasm may need single-thread if it hangs starting the integrated server.")
                 }
             }
             .navigationTitle("Falcon")
