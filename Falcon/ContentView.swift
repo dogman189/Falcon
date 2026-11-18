@@ -348,19 +348,20 @@ struct ContentView: View {
                             .font(.caption)
                             .foregroundStyle(.white.opacity(0.72))
                             .lineLimit(2)
-                            .fixedSize(horizontal: false, vertical: true)
                     } else if !isAvailable {
                         Text("Bundle missing")
                             .font(.caption)
                             .foregroundStyle(.orange.opacity(0.9))
+                            .lineLimit(2)
                     } else {
                         Text("Tap to launch")
                             .font(.caption)
                             .foregroundStyle(.white.opacity(0.55))
+                            .lineLimit(2)
                     }
                 }
                 .padding(14)
-                .frame(width: 260, alignment: .leading)
+                .frame(width: 260, height: 72, alignment: .topLeading)
                 .background(Color.white.opacity(isAvailable ? 0.08 : 0.04))
             }
             .frame(width: 260)
