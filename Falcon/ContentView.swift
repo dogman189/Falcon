@@ -166,7 +166,7 @@ struct ContentView: View {
                     .padding(.top, 8)
 
                     VStack(spacing: 14) {
-                        ForEach(BundledClient.all) { client in
+                        ForEach(GameClient.all) { client in
                             let isAvailable = client.url != nil
                             Button {
                                 clientFailure = nil
@@ -243,8 +243,9 @@ struct ContentView: View {
             return
         }
         let requested = String(argument.dropFirst("--client=".count))
-        guard let client = BundledClient.all.first(where: {
-            $0.name == requested || $0.resource == requested
+        let allClients = GameClient.bundled + CustomClientStore.shared.load()
+        guard let client = allClients.first(where: {
+            $0.name == requested || $0.id == requested
         }) else {
             return
         }
