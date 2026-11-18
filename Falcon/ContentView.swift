@@ -17,6 +17,7 @@ struct ContentView: View {
     @State private var showingFileImporter = false
     @State private var importErrorMessage: String?
     @State private var showingImportError = false
+    @State private var snapshotter = WebViewSnapshotter()
 
     var body: some View {
         Group {
@@ -24,7 +25,7 @@ struct ContentView: View {
                 if let clientFailure {
                     failureView(for: selectedClient, message: clientFailure)
                 } else if let fileURL = selectedClient.url {
-                    EaglerWebView(fileURL: fileURL) { message in
+                    EaglerWebView(fileURL: fileURL, snapshotter: snapshotter) { message in
                         clientFailure = message
                     }
                     .ignoresSafeArea()
@@ -79,9 +80,7 @@ struct ContentView: View {
 
     private var quitButton: some View {
         Button {
-            hideQuit()
-            clientFailure = nil
-            selectedClient = nil
+            quitCurrentClient()
         } label: {
             Text("Quit")
                 .font(.subheadline.weight(.semibold))
@@ -395,6 +394,20 @@ struct ContentView: View {
         }
         CustomClientStore.shared.remove(client)
         loadClients()
+    }
+
+    private func quitCurrentClient() {
+        hideQuit()
+        let client = selectedClient
+        snapshotter.takeSnapshot { image in
+            DispatchQueue.main.async {
+                if let client, let image {
+                    try? ClientCoverStore.shared.save(image: image, for: client.id)
+                }
+                clientFailure = nil
+                selectedClient = nil
+            }
+        }
     }
 }
 

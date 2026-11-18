@@ -1,9 +1,24 @@
 import SwiftUI
 import WebKit
 
+final class WebViewSnapshotter {
+    fileprivate weak var webView: WKWebView?
+
+    func takeSnapshot(completion: @escaping (UIImage?) -> Void) {
+        guard let webView else {
+            completion(nil)
+            return
+        }
+        webView.takeSnapshot(with: nil) { image, _ in
+            completion(image)
+        }
+    }
+}
+
 /// Immersive wrapper that loads a selected bundled client in a browser-chrome-free WKWebView.
 struct EaglerWebView: UIViewRepresentable {
     let fileURL: URL
+    var snapshotter: WebViewSnapshotter?
     var onFailure: (String) -> Void
 
     func makeCoordinator() -> Coordinator {
@@ -34,11 +49,14 @@ struct EaglerWebView: UIViewRepresentable {
         }
         #endif
 
+        snapshotter?.webView = webView
         loadSelectedClient(in: webView)
         return webView
     }
 
-    func updateUIView(_ uiView: WKWebView, context: Context) {}
+    func updateUIView(_ uiView: WKWebView, context: Context) {
+        snapshotter?.webView = uiView
+    }
 
     private func loadSelectedClient(in webView: WKWebView) {
         guard FileManager.default.fileExists(atPath: fileURL.path) else {
