@@ -208,10 +208,14 @@ struct ContentView: View {
                             .font(.caption.weight(.bold))
                             .kerning(1.2)
                             .foregroundStyle(.white.opacity(0.55))
-                        VStack(spacing: 14) {
-                            ForEach(GameClient.bundled) { client in
-                                clientCard(for: client)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 16) {
+                                ForEach(GameClient.bundled) { client in
+                                    clientTile(for: client)
+                                }
                             }
+                            .padding(.vertical, 4)
+                            .padding(.horizontal, 2)
                         }
                     }
 
@@ -228,17 +232,21 @@ struct ContentView: View {
                                 .padding(.horizontal, 4)
                                 .padding(.vertical, 6)
                         } else {
-                            VStack(spacing: 14) {
-                                ForEach(customClients) { client in
-                                    clientCard(for: client)
-                                        .contextMenu {
-                                            Button(role: .destructive) {
-                                                removeCustomClient(client)
-                                            } label: {
-                                                Label("Remove Client", systemImage: "trash")
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 16) {
+                                    ForEach(customClients) { client in
+                                        clientTile(for: client)
+                                            .contextMenu {
+                                                Button(role: .destructive) {
+                                                    removeCustomClient(client)
+                                                } label: {
+                                                    Label("Remove Client", systemImage: "trash")
+                                                }
                                             }
-                                        }
+                                    }
                                 }
+                                .padding(.vertical, 4)
+                                .padding(.horizontal, 2)
                             }
                         }
                     }
@@ -259,57 +267,74 @@ struct ContentView: View {
     }
 
     @ViewBuilder
-    private func clientCard(for client: GameClient) -> some View {
+    private func clientTile(for client: GameClient) -> some View {
         let isAvailable = client.url != nil
         Button {
             clientFailure = nil
             selectedClient = client
         } label: {
-            HStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 8) {
-                        Text(client.name)
-                            .font(.title3.weight(.bold))
-                            .foregroundStyle(.white)
-                        if client.isCustom {
-                            Text("CUSTOM")
-                                .font(.caption2.weight(.bold))
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(Color.cyan.opacity(0.22))
-                                .clipShape(Capsule())
-                                .foregroundStyle(.cyan)
-                        }
+            VStack(alignment: .leading, spacing: 0) {
+                ZStack(alignment: .topLeading) {
+                    Image(client.coverImageName)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 260, height: 150)
+                        .clipped()
+
+                    LinearGradient(
+                        colors: [.black.opacity(0.05), .black.opacity(0.55)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(width: 260, height: 150)
+
+                    if client.isCustom {
+                        Text("CUSTOM")
+                            .font(.caption2.weight(.bold))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.black.opacity(0.45))
+                            .clipShape(Capsule())
+                            .foregroundStyle(.cyan)
+                            .padding(10)
                     }
+
+                    if !isAvailable {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundStyle(.orange)
+                            .padding(10)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(client.name)
+                        .font(.headline.weight(.bold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
                     if let note = client.note {
                         Text(note)
-                            .font(.subheadline)
+                            .font(.caption)
                             .foregroundStyle(.white.opacity(0.72))
+                            .lineLimit(2)
                             .fixedSize(horizontal: false, vertical: true)
                     } else if !isAvailable {
                         Text("Bundle missing")
-                            .font(.subheadline)
+                            .font(.caption)
                             .foregroundStyle(.orange.opacity(0.9))
+                    } else {
+                        Text("Tap to launch")
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.55))
                     }
                 }
-                Spacer(minLength: 12)
-                if isAvailable {
-                    Image(systemName: "chevron.right.circle.fill")
-                        .font(.system(size: 28, weight: .semibold))
-                        .foregroundStyle(Color.cyan)
-                } else {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 24, weight: .semibold))
-                        .foregroundStyle(.orange)
-                }
+                .padding(14)
+                .frame(width: 260, alignment: .leading)
+                .background(Color.white.opacity(isAvailable ? 0.08 : 0.04))
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 18)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(Color.white.opacity(isAvailable ? 0.08 : 0.04))
-            )
+            .frame(width: 260)
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .stroke(
