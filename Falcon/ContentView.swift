@@ -222,6 +222,7 @@ struct ContentView: View {
                             .foregroundStyle(.white)
                         }
                     }
+                    .padding(.horizontal, 24)
                     .padding(.top, 8)
 
                     VStack(alignment: .leading, spacing: 12) {
@@ -229,6 +230,7 @@ struct ContentView: View {
                             .font(.caption.weight(.bold))
                             .kerning(1.2)
                             .foregroundStyle(.white.opacity(0.55))
+                            .padding(.horizontal, 24)
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 16) {
                                 ForEach(GameClient.bundled) { client in
@@ -240,7 +242,7 @@ struct ContentView: View {
                                 }
                             }
                             .padding(.vertical, 4)
-                            .padding(.horizontal, 2)
+                            .padding(.horizontal, 24)
                         }
                     }
 
@@ -249,12 +251,13 @@ struct ContentView: View {
                             .font(.caption.weight(.bold))
                             .kerning(1.2)
                             .foregroundStyle(.white.opacity(0.55))
+                            .padding(.horizontal, 24)
 
                         if customClients.isEmpty {
                             Text("No custom clients yet. Add a single .html client file from Files.")
                                 .font(.subheadline)
                                 .foregroundStyle(.white.opacity(0.6))
-                                .padding(.horizontal, 4)
+                                .padding(.horizontal, 24)
                                 .padding(.vertical, 6)
                         } else {
                             ScrollView(.horizontal, showsIndicators: false) {
@@ -273,7 +276,7 @@ struct ContentView: View {
                                     }
                                 }
                                 .padding(.vertical, 4)
-                                .padding(.horizontal, 2)
+                                .padding(.horizontal, 24)
                             }
                         }
                     }
@@ -282,13 +285,13 @@ struct ContentView: View {
                         .font(.footnote)
                         .foregroundStyle(.white.opacity(0.55))
                         .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 24)
                         .padding(.top, 4)
                         .padding(.bottom, 12)
                 }
-                .padding(.horizontal, 24)
                 .padding(.vertical, 28)
                 .frame(maxWidth: 900, alignment: .leading)
-                .frame(maxWidth: .infinity, alignment: .center)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
     }
