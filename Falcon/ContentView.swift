@@ -6,12 +6,17 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ContentView: View {
-    @State private var selectedClient: BundledClient?
+    @State private var selectedClient: GameClient?
     @State private var quitRevealed = false
     @State private var quitHideTask: Task<Void, Never>?
     @State private var clientFailure: String?
+    @State private var customClients: [GameClient] = []
+    @State private var showingFileImporter = false
+    @State private var importErrorMessage: String?
+    @State private var showingImportError = false
 
     var body: some View {
         Group {
@@ -55,7 +60,20 @@ struct ContentView: View {
             hideQuit()
         }
         .task {
+            loadClients()
             openDebugClientIfRequested()
+        }
+        .fileImporter(
+            isPresented: $showingFileImporter,
+            allowedContentTypes: [.html, UTType(filenameExtension: "htm")].compactMap { $0 },
+            allowsMultipleSelection: false
+        ) { result in
+            handleImport(result)
+        }
+        .alert("Couldn't Add Client", isPresented: $showingImportError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(importErrorMessage ?? "Unknown error.")
         }
     }
 
@@ -105,7 +123,7 @@ struct ContentView: View {
         quitRevealed = false
     }
 
-    private func failureView(for client: BundledClient, message: String) -> some View {
+    private func failureView(for client: GameClient, message: String) -> some View {
         VStack(spacing: 18) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 44))
@@ -155,68 +173,73 @@ struct ContentView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("FALCON")
-                            .font(.system(size: 42, weight: .black, design: .rounded))
-                            .kerning(2)
+                        HStack(alignment: .top) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("FALCON")
+                                    .font(.system(size: 42, weight: .black, design: .rounded))
+                                    .kerning(2)
+                                    .foregroundStyle(.white)
+                                Text("Select a client to launch")
+                                    .font(.title3.weight(.medium))
+                                    .foregroundStyle(.white.opacity(0.72))
+                            }
+                            Spacer()
+                            Button {
+                                showingFileImporter = true
+                            } label: {
+                                Label("Add Client", systemImage: "plus")
+                                    .font(.subheadline.weight(.semibold))
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 10)
+                                    .background(Color.cyan.opacity(0.18))
+                                    .overlay(
+                                        Capsule().stroke(Color.cyan.opacity(0.45), lineWidth: 1)
+                                    )
+                                    .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
                             .foregroundStyle(.white)
-                        Text("Select a client to launch")
-                            .font(.title3.weight(.medium))
-                            .foregroundStyle(.white.opacity(0.72))
+                        }
                     }
                     .padding(.top, 8)
 
-                    VStack(spacing: 14) {
-                        ForEach(GameClient.all) { client in
-                            let isAvailable = client.url != nil
-                            Button {
-                                clientFailure = nil
-                                selectedClient = client
-                            } label: {
-                                HStack(spacing: 16) {
-                                    VStack(alignment: .leading, spacing: 6) {
-                                        Text(client.name)
-                                            .font(.title3.weight(.bold))
-                                            .foregroundStyle(.white)
-                                        if let note = client.note {
-                                            Text(note)
-                                                .font(.subheadline)
-                                                .foregroundStyle(.white.opacity(0.72))
-                                                .fixedSize(horizontal: false, vertical: true)
-                                        } else if !isAvailable {
-                                            Text("Bundle missing")
-                                                .font(.subheadline)
-                                                .foregroundStyle(.orange.opacity(0.9))
-                                        }
-                                    }
-                                    Spacer(minLength: 12)
-                                    if isAvailable {
-                                        Image(systemName: "chevron.right.circle.fill")
-                                            .font(.system(size: 28, weight: .semibold))
-                                            .foregroundStyle(Color.cyan)
-                                    } else {
-                                        Image(systemName: "exclamationmark.triangle.fill")
-                                            .font(.system(size: 24, weight: .semibold))
-                                            .foregroundStyle(.orange)
-                                    }
-                                }
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 18)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                        .fill(Color.white.opacity(isAvailable ? 0.08 : 0.04))
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                        .stroke(
-                                            isAvailable ? Color.cyan.opacity(0.35) : Color.orange.opacity(0.25),
-                                            lineWidth: 1
-                                        )
-                                )
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("BUNDLED")
+                            .font(.caption.weight(.bold))
+                            .kerning(1.2)
+                            .foregroundStyle(.white.opacity(0.55))
+                        VStack(spacing: 14) {
+                            ForEach(GameClient.bundled) { client in
+                                clientCard(for: client)
                             }
-                            .buttonStyle(.plain)
-                            .disabled(!isAvailable)
-                            .opacity(isAvailable ? 1 : 0.6)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("CUSTOM")
+                            .font(.caption.weight(.bold))
+                            .kerning(1.2)
+                            .foregroundStyle(.white.opacity(0.55))
+
+                        if customClients.isEmpty {
+                            Text("No custom clients yet. Add a single .html client file from Files.")
+                                .font(.subheadline)
+                                .foregroundStyle(.white.opacity(0.6))
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 6)
+                        } else {
+                            VStack(spacing: 14) {
+                                ForEach(customClients) { client in
+                                    clientCard(for: client)
+                                        .contextMenu {
+                                            Button(role: .destructive) {
+                                                removeCustomClient(client)
+                                            } label: {
+                                                Label("Remove Client", systemImage: "trash")
+                                            }
+                                        }
+                                }
+                            }
                         }
                     }
 
@@ -235,6 +258,71 @@ struct ContentView: View {
         }
     }
 
+    @ViewBuilder
+    private func clientCard(for client: GameClient) -> some View {
+        let isAvailable = client.url != nil
+        Button {
+            clientFailure = nil
+            selectedClient = client
+        } label: {
+            HStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 8) {
+                        Text(client.name)
+                            .font(.title3.weight(.bold))
+                            .foregroundStyle(.white)
+                        if client.isCustom {
+                            Text("CUSTOM")
+                                .font(.caption2.weight(.bold))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(Color.cyan.opacity(0.22))
+                                .clipShape(Capsule())
+                                .foregroundStyle(.cyan)
+                        }
+                    }
+                    if let note = client.note {
+                        Text(note)
+                            .font(.subheadline)
+                            .foregroundStyle(.white.opacity(0.72))
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else if !isAvailable {
+                        Text("Bundle missing")
+                            .font(.subheadline)
+                            .foregroundStyle(.orange.opacity(0.9))
+                    }
+                }
+                Spacer(minLength: 12)
+                if isAvailable {
+                    Image(systemName: "chevron.right.circle.fill")
+                        .font(.system(size: 28, weight: .semibold))
+                        .foregroundStyle(Color.cyan)
+                } else {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundStyle(.orange)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Color.white.opacity(isAvailable ? 0.08 : 0.04))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(
+                        isAvailable ? Color.cyan.opacity(0.35) : Color.orange.opacity(0.25),
+                        lineWidth: 1
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(!isAvailable)
+        .opacity(isAvailable ? 1 : 0.6)
+    }
+
     private func openDebugClientIfRequested() {
         #if DEBUG
         guard selectedClient == nil else { return }
@@ -243,7 +331,7 @@ struct ContentView: View {
             return
         }
         let requested = String(argument.dropFirst("--client=".count))
-        let allClients = GameClient.bundled + CustomClientStore.shared.load()
+        let allClients = GameClient.bundled + customClients
         guard let client = allClients.first(where: {
             $0.name == requested || $0.id == requested
         }) else {
@@ -251,6 +339,37 @@ struct ContentView: View {
         }
         selectedClient = client
         #endif
+    }
+
+    private func loadClients() {
+        customClients = CustomClientStore.shared.load()
+    }
+
+    private func handleImport(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            guard let url = urls.first else { return }
+            do {
+                _ = try CustomClientStore.shared.importClient(from: url)
+                loadClients()
+            } catch {
+                importErrorMessage = error.localizedDescription
+                showingImportError = true
+            }
+        case .failure(let error):
+            importErrorMessage = error.localizedDescription
+            showingImportError = true
+        }
+    }
+
+    private func removeCustomClient(_ client: GameClient) {
+        guard client.isCustom else { return }
+        if selectedClient?.id == client.id {
+            selectedClient = nil
+            clientFailure = nil
+        }
+        CustomClientStore.shared.remove(client)
+        loadClients()
     }
 }
 
