@@ -16,6 +16,24 @@ struct GameClient: Identifiable, Hashable {
         return false
     }
 
+    var coverImageName: String {
+        switch source {
+        case let .bundled(resource, _, _, _):
+            switch resource {
+            case "Eaglet":
+                return "ClientCover-Eaglet"
+            case "1.8.8-wasm":
+                return "ClientCover-188"
+            case "1.21.11-wasm":
+                return "ClientCover-12111"
+            default:
+                return "ClientCover-Custom"
+            }
+        case .custom:
+            return "ClientCover-Custom"
+        }
+    }
+
     var url: URL? {
         switch source {
         case let .bundled(resource, fileExtension, query, fragment):
