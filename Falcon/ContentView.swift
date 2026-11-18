@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import PhotosUI
 import UniformTypeIdentifiers
 
 struct ContentView: View {
@@ -18,6 +19,11 @@ struct ContentView: View {
     @State private var importErrorMessage: String?
     @State private var showingImportError = false
     @State private var snapshotter = WebViewSnapshotter()
+    @State private var coverTargetClient: GameClient?
+    @State private var showingPhotoPicker = false
+    @State private var showingCoverFileImporter = false
+    @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var coverRevision = 0
 
     var body: some View {
         Group {
@@ -70,6 +76,22 @@ struct ContentView: View {
             allowsMultipleSelection: false
         ) { result in
             handleImport(result)
+        }
+        .fileImporter(
+            isPresented: $showingCoverFileImporter,
+            allowedContentTypes: [.image],
+            allowsMultipleSelection: false
+        ) { result in
+            handleCoverFileImport(result)
+        }
+        .photosPicker(
+            isPresented: $showingPhotoPicker,
+            selection: $selectedPhotoItem,
+            matching: .images
+        )
+        .onChange(of: selectedPhotoItem) { _, newItem in
+            guard let newItem else { return }
+            Task { await handleSelectedPhotoItem(newItem) }
         }
         .alert("Couldn't Add Client", isPresented: $showingImportError) {
             Button("OK", role: .cancel) {}
@@ -211,6 +233,10 @@ struct ContentView: View {
                             HStack(spacing: 16) {
                                 ForEach(GameClient.bundled) { client in
                                     clientTile(for: client)
+                                        .id("\(client.id)-\(coverRevision)")
+                                        .contextMenu {
+                                            coverMenuItems(for: client)
+                                        }
                                 }
                             }
                             .padding(.vertical, 4)
@@ -235,7 +261,9 @@ struct ContentView: View {
                                 HStack(spacing: 16) {
                                     ForEach(customClients) { client in
                                         clientTile(for: client)
+                                            .id("\(client.id)-\(coverRevision)")
                                             .contextMenu {
+                                                coverMenuItems(for: client)
                                                 Button(role: .destructive) {
                                                     removeCustomClient(client)
                                                 } label: {
@@ -274,7 +302,7 @@ struct ContentView: View {
         } label: {
             VStack(alignment: .leading, spacing: 0) {
                 ZStack(alignment: .topLeading) {
-                    Image(client.coverImageName)
+                    coverImage(for: client)
                         .resizable()
                         .scaledToFill()
                         .frame(width: 260, height: 150)
@@ -403,10 +431,80 @@ struct ContentView: View {
             DispatchQueue.main.async {
                 if let client, let image {
                     try? ClientCoverStore.shared.save(image: image, for: client.id)
+                    coverRevision += 1
                 }
                 clientFailure = nil
                 selectedClient = nil
             }
+        }
+    }
+
+    private func coverImage(for client: GameClient) -> Image {
+        if let url = ClientCoverStore.shared.coverURL(for: client.id),
+           let uiImage = UIImage(contentsOfFile: url.path) {
+            return Image(uiImage: uiImage)
+        }
+        return Image(client.defaultCoverImageName)
+    }
+
+    @ViewBuilder
+    private func coverMenuItems(for client: GameClient) -> some View {
+        Button {
+            coverTargetClient = client
+            showingPhotoPicker = true
+        } label: {
+            Label("Set Cover from Photos", systemImage: "photo")
+        }
+        Button {
+            coverTargetClient = client
+            showingCoverFileImporter = true
+        } label: {
+            Label("Set Cover from Files", systemImage: "folder")
+        }
+        if ClientCoverStore.shared.coverURL(for: client.id) != nil {
+            Button(role: .destructive) {
+                ClientCoverStore.shared.reset(for: client.id)
+                coverRevision += 1
+            } label: {
+                Label("Reset Cover", systemImage: "arrow.uturn.backward")
+            }
+        }
+    }
+
+    private func handleCoverFileImport(_ result: Result<[URL], Error>) {
+        defer { coverTargetClient = nil }
+        switch result {
+        case .success(let urls):
+            guard let url = urls.first, let client = coverTargetClient else { return }
+            do {
+                try ClientCoverStore.shared.importCover(from: url, for: client.id)
+                coverRevision += 1
+            } catch {
+                importErrorMessage = error.localizedDescription
+                showingImportError = true
+            }
+        case .failure(let error):
+            importErrorMessage = error.localizedDescription
+            showingImportError = true
+        }
+    }
+
+    private func handleSelectedPhotoItem(_ item: PhotosPickerItem) async {
+        let target = coverTargetClient
+        defer {
+            Task { @MainActor in
+                coverTargetClient = nil
+                selectedPhotoItem = nil
+            }
+        }
+        guard let target,
+              let data = try? await item.loadTransferable(type: Data.self),
+              let image = UIImage(data: data) else {
+            return
+        }
+        await MainActor.run {
+            try? ClientCoverStore.shared.save(image: image, for: target.id)
+            coverRevision += 1
         }
     }
 }
