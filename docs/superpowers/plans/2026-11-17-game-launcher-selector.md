@@ -15,7 +15,7 @@
 - No new image assets or per-client artwork.
 - No behavior changes to web/game loading, quit gesture, or failure handling.
 - Keep tap targets and text readable in landscape.
-- Preserve clients list and notes: `Eaglet`, `1.8.8-wasm` (single-thread hint), `1.12.2-wasm`, `1.21.11-wasm`; footer keeps swipe-to-quit and 1.8.8 guidance.
+- Preserve clients list and notes: `Eaglet`, `1.8.8-wasm` (single-thread hint), `1.21.11-wasm`; footer keeps swipe-to-quit and 1.8.8 guidance.
 
 ## Review Focus
 

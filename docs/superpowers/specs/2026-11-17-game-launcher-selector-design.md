@@ -7,7 +7,7 @@ Replace the stock list-based client selector with a game-launcher feel so Falcon
 
 ## Goals
 - Full-screen dark launcher screen with prominent “Falcon” header/subtitle.
-- Each bundled client (`Eaglet`, `1.8.8-wasm`, `1.12.2-wasm`, `1.21.11-wasm`) presented as a large tappable card showing name, optional note/badge, and a clear play/chevron affordance.
+- Each bundled client (`Eaglet`, `1.8.8-wasm`, `1.21.11-wasm`) presented as a large tappable card showing name, optional note/badge, and a clear play/chevron affordance.
 - Preserve footer hint: swipe down in top-left to reveal Quit and the 1.8.8 single-thread guidance.
 - Keep existing behavior: tap launches client, missing-bundle clients disabled/warned, debug `--client=` auto-open unchanged.
 
