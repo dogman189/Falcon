@@ -140,40 +140,98 @@ struct ContentView: View {
     }
 
     private var clientSelector: some View {
-        NavigationStack {
-            List {
-                Section {
-                    ForEach(BundledClient.all) { client in
-                        Button {
-                            clientFailure = nil
-                            selectedClient = client
-                        } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(client.name)
-                                        .foregroundStyle(.primary)
-                                    if let note = client.note {
-                                        Text(note)
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
+        ZStack {
+            LinearGradient(
+                colors: [
+                    Color(red: 0.05, green: 0.08, blue: 0.14),
+                    Color(red: 0.02, green: 0.03, blue: 0.06),
+                    .black
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("FALCON")
+                            .font(.system(size: 42, weight: .black, design: .rounded))
+                            .kerning(2)
+                            .foregroundStyle(.white)
+                        Text("Select a client to launch")
+                            .font(.title3.weight(.medium))
+                            .foregroundStyle(.white.opacity(0.72))
+                    }
+                    .padding(.top, 8)
+
+                    VStack(spacing: 14) {
+                        ForEach(BundledClient.all) { client in
+                            let isAvailable = client.url != nil
+                            Button {
+                                clientFailure = nil
+                                selectedClient = client
+                            } label: {
+                                HStack(spacing: 16) {
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        Text(client.name)
+                                            .font(.title3.weight(.bold))
+                                            .foregroundStyle(.white)
+                                        if let note = client.note {
+                                            Text(note)
+                                                .font(.subheadline)
+                                                .foregroundStyle(.white.opacity(0.72))
+                                                .fixedSize(horizontal: false, vertical: true)
+                                        } else if !isAvailable {
+                                            Text("Bundle missing")
+                                                .font(.subheadline)
+                                                .foregroundStyle(.orange.opacity(0.9))
+                                        }
+                                    }
+                                    Spacer(minLength: 12)
+                                    if isAvailable {
+                                        Image(systemName: "chevron.right.circle.fill")
+                                            .font(.system(size: 28, weight: .semibold))
+                                            .foregroundStyle(Color.cyan)
+                                    } else {
+                                        Image(systemName: "exclamationmark.triangle.fill")
+                                            .font(.system(size: 24, weight: .semibold))
+                                            .foregroundStyle(.orange)
                                     }
                                 }
-                                Spacer()
-                                if client.url == nil {
-                                    Image(systemName: "exclamationmark.triangle")
-                                        .foregroundStyle(.secondary)
-                                }
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 18)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                        .fill(Color.white.opacity(isAvailable ? 0.08 : 0.04))
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                        .stroke(
+                                            isAvailable ? Color.cyan.opacity(0.35) : Color.orange.opacity(0.25),
+                                            lineWidth: 1
+                                        )
+                                )
                             }
+                            .buttonStyle(.plain)
+                            .disabled(!isAvailable)
+                            .opacity(isAvailable ? 1 : 0.6)
                         }
-                        .disabled(client.url == nil)
                     }
-                } header: {
-                    Text("Select a client")
-                } footer: {
+
                     Text("Swipe down in the top-left corner to reveal Quit. 1.8.8-wasm may need single-thread if it hangs starting the integrated server.")
+                        .font(.footnote)
+                        .foregroundStyle(.white.opacity(0.55))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 4)
+                        .padding(.bottom, 12)
                 }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 28)
+                .frame(maxWidth: 900, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .center)
             }
-            .navigationTitle("Falcon")
         }
     }
 
