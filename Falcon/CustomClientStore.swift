@@ -114,6 +114,7 @@ final class CustomClientStore {
         }
         records.removeAll { $0.id == client.id }
         saveRecords(records)
+        ClientCoverStore.shared.reset(for: client.id)
     }
 
     private func ensureBaseDirectory() throws {

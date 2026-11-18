@@ -16,7 +16,7 @@ struct GameClient: Identifiable, Hashable {
         return false
     }
 
-    var coverImageName: String {
+    var defaultCoverImageName: String {
         switch source {
         case let .bundled(resource, _, _, _):
             switch resource {
@@ -33,6 +33,12 @@ struct GameClient: Identifiable, Hashable {
             return "ClientCover-Custom"
         }
     }
+
+    var storedCoverURL: URL? {
+        ClientCoverStore.shared.coverURL(for: id)
+    }
+
+    var coverImageName: String { defaultCoverImageName }
 
     var url: URL? {
         switch source {
