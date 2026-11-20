@@ -65,6 +65,7 @@ struct ContentView: View {
         }
         .onChange(of: selectedClient) { _, _ in
             hideQuit()
+            OrientationLock.shared.portraitOnly = (selectedClient == nil)
         }
         .task {
             loadClients()
@@ -180,110 +181,96 @@ struct ContentView: View {
 
     private var clientSelector: some View {
         ZStack {
-            LinearGradient(
-                colors: [
-                    Color(red: 0.05, green: 0.08, blue: 0.14),
-                    Color(red: 0.02, green: 0.03, blue: 0.06),
-                    .black
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
+            Color(.systemBackground)
+                .ignoresSafeArea()
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(alignment: .top) {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("FALCON")
-                                    .font(.system(size: 42, weight: .black, design: .rounded))
-                                    .kerning(2)
-                                    .foregroundStyle(.white)
-                                Text("Select a client to launch")
-                                    .font(.title3.weight(.medium))
-                                    .foregroundStyle(.white.opacity(0.72))
-                            }
-                            Spacer()
-                            Button {
-                                showingFileImporter = true
-                            } label: {
-                                Label("Add Client", systemImage: "plus")
-                                    .font(.subheadline.weight(.semibold))
-                                    .padding(.horizontal, 14)
-                                    .padding(.vertical, 10)
-                                    .background(Color.cyan.opacity(0.18))
-                                    .overlay(
-                                        Capsule().stroke(Color.cyan.opacity(0.45), lineWidth: 1)
-                                    )
-                                    .clipShape(Capsule())
-                            }
-                            .buttonStyle(.plain)
-                            .foregroundStyle(.white)
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .top) {
+                        Text("Select a client to launch")
+                            .font(.title3.weight(.medium))
+
+                        Spacer()
+
+                        Button {
+                            showingFileImporter = true
+                        } label: {
+                            Label("Add Client", systemImage: "plus")
+                                .font(.subheadline.weight(.semibold))
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 10)
+                                .background(Color.cyan.opacity(0.18))
+                                .overlay(
+                                    Capsule().stroke(Color.cyan.opacity(0.45), lineWidth: 1)
+                                )
+                                .clipShape(Capsule())
                         }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.cyan)
                     }
                     .padding(.horizontal, 24)
                     .padding(.top, 8)
 
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("BUNDLED")
-                            .font(.caption.weight(.bold))
-                            .kerning(1.2)
-                            .foregroundStyle(.white.opacity(0.55))
-                            .padding(.horizontal, 24)
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 16) {
-                                ForEach(GameClient.bundled) { client in
-                                    clientTile(for: client)
-                                        .id("\(client.id)-\(coverRevision)")
-                                        .contextMenu {
-                                            coverMenuItems(for: client)
-                                        }
-                                }
-                            }
-                            .padding(.vertical, 4)
-                            .padding(.horizontal, 24)
+                    Text("BUNDLED")
+                        .font(.caption.weight(.bold))
+                        .kerning(1.2)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 24)
+
+                    ForEach(GameClient.bundled) { client in
+                        Button {
+                            clientFailure = nil
+                            selectedClient = client
+                        } label: {
+                            SelectorRow(client: client, cover: coverImage(for: client))
                         }
+                        .buttonStyle(.plain)
+                        .disabled(client.url == nil)
+                        .id("\(client.id)-\(coverRevision)")
+                        .contextMenu {
+                            coverMenuItems(for: client)
+                        }
+                        .padding(.horizontal, 24)
                     }
 
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("CUSTOM")
-                            .font(.caption.weight(.bold))
-                            .kerning(1.2)
-                            .foregroundStyle(.white.opacity(0.55))
-                            .padding(.horizontal, 24)
+                    Text("CUSTOM")
+                        .font(.caption.weight(.bold))
+                        .kerning(1.2)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 24)
 
-                        if customClients.isEmpty {
-                            Text("No custom clients yet. Add a single .html client file from Files.")
-                                .font(.subheadline)
-                                .foregroundStyle(.white.opacity(0.6))
-                                .padding(.horizontal, 24)
-                                .padding(.vertical, 6)
-                        } else {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 16) {
-                                    ForEach(customClients) { client in
-                                        clientTile(for: client)
-                                            .id("\(client.id)-\(coverRevision)")
-                                            .contextMenu {
-                                                coverMenuItems(for: client)
-                                                Button(role: .destructive) {
-                                                    removeCustomClient(client)
-                                                } label: {
-                                                    Label("Remove Client", systemImage: "trash")
-                                                }
-                                            }
-                                    }
-                                }
-                                .padding(.vertical, 4)
-                                .padding(.horizontal, 24)
+                    if customClients.isEmpty {
+                        Text("No custom clients yet. Add a single .html client file from Files.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 6)
+                    } else {
+                        ForEach(customClients) { client in
+                            Button {
+                                clientFailure = nil
+                                selectedClient = client
+                            } label: {
+                                SelectorRow(client: client, cover: coverImage(for: client))
                             }
+                            .buttonStyle(.plain)
+                            .disabled(client.url == nil)
+                            .id("\(client.id)-\(coverRevision)")
+                            .contextMenu {
+                                coverMenuItems(for: client)
+                                Button(role: .destructive) {
+                                    removeCustomClient(client)
+                                } label: {
+                                    Label("Remove Client", systemImage: "trash")
+                                }
+                            }
+                            .padding(.horizontal, 24)
                         }
                     }
 
                     Text("Swipe down in the top-left corner to reveal Quit. 1.8.8-wasm may need single-thread if it hangs starting the integrated server.")
                         .font(.footnote)
-                        .foregroundStyle(.white.opacity(0.55))
+                        .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.horizontal, 24)
                         .padding(.top, 4)
@@ -294,89 +281,6 @@ struct ContentView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-    }
-
-    @ViewBuilder
-    private func clientTile(for client: GameClient) -> some View {
-        let isAvailable = client.url != nil
-        Button {
-            clientFailure = nil
-            selectedClient = client
-        } label: {
-            VStack(alignment: .leading, spacing: 0) {
-                ZStack(alignment: .topLeading) {
-                    coverImage(for: client)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 260, height: 150)
-                        .clipped()
-
-                    LinearGradient(
-                        colors: [.black.opacity(0.05), .black.opacity(0.55)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .frame(width: 260, height: 150)
-
-                    if client.isCustom {
-                        Text("CUSTOM")
-                            .font(.caption2.weight(.bold))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color.black.opacity(0.45))
-                            .clipShape(Capsule())
-                            .foregroundStyle(.cyan)
-                            .padding(10)
-                    }
-
-                    if !isAvailable {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 20, weight: .semibold))
-                            .foregroundStyle(.orange)
-                            .padding(10)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(client.name)
-                        .font(.headline.weight(.bold))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                    if let note = client.note {
-                        Text(note)
-                            .font(.caption)
-                            .foregroundStyle(.white.opacity(0.72))
-                            .lineLimit(2)
-                    } else if !isAvailable {
-                        Text("Bundle missing")
-                            .font(.caption)
-                            .foregroundStyle(.orange.opacity(0.9))
-                            .lineLimit(2)
-                    } else {
-                        Text("Tap to launch")
-                            .font(.caption)
-                            .foregroundStyle(.white.opacity(0.55))
-                            .lineLimit(2)
-                    }
-                }
-                .padding(14)
-                .frame(width: 260, height: 72, alignment: .topLeading)
-                .background(Color.white.opacity(isAvailable ? 0.08 : 0.04))
-            }
-            .frame(width: 260)
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .stroke(
-                        isAvailable ? Color.cyan.opacity(0.35) : Color.orange.opacity(0.25),
-                        lineWidth: 1
-                    )
-            )
-        }
-        .buttonStyle(.plain)
-        .disabled(!isAvailable)
-        .opacity(isAvailable ? 1 : 0.6)
     }
 
     private func openDebugClientIfRequested() {
