@@ -65,6 +65,7 @@ struct ContentView: View {
         }
         .onChange(of: selectedClient) { _, _ in
             hideQuit()
+            OrientationLock.shared.portraitOnly = (selectedClient == nil)
         }
         .task {
             loadClients()
