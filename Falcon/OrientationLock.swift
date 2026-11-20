@@ -24,7 +24,7 @@ final class OrientationLock: ObservableObject {
 
         // The deployment target is iOS 27.2, so these iOS 16+ APIs are always available.
         scene.requestGeometryUpdate(
-            .iOS(interfaceOrientations: portraitOnly ? .portrait : .allButUpsideDown)
+            .iOS(interfaceOrientations: portraitOnly ? .portrait : .landscape)
         )
         scene.keyWindow?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
     }

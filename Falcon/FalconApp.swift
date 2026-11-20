@@ -23,6 +23,6 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         supportedInterfaceOrientationsFor window: UIWindow?
     ) -> UIInterfaceOrientationMask {
-        OrientationLock.shared.portraitOnly ? .portrait : .allButUpsideDown
+        OrientationLock.shared.portraitOnly ? .portrait : .landscape
     }
 }
