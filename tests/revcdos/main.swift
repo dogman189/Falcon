@@ -3,6 +3,7 @@ func runTests() {
     testMissingAssetsReportsBinaries()
     testResolvedFileURLRejectsTraversal()
     testContentTypeAndBrotliRules()
+    testBrotliResponseHeaders()
     print("ALL TESTS PASSED")
 }
 
