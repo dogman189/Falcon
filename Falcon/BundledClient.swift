@@ -21,12 +21,8 @@ struct GameClient: Identifiable, Hashable {
         switch source {
         case let .bundled(resource, _, _, _):
             switch resource {
-            case "Eaglet":
-                return "ClientCover-Eaglet"
             case "1.8.8-wasm":
                 return "ClientCover-188"
-            case "1.21.11-wasm":
-                return "ClientCover-12111"
             default:
                 return "ClientCover-Custom"
             }
@@ -68,20 +64,10 @@ struct GameClient: Identifiable, Hashable {
 
     static let bundled: [GameClient] = [
         GameClient(
-            id: "bundled:Eaglet",
-            name: "Eaglet",
-            source: .bundled(resource: "Eaglet", fileExtension: "html", query: nil, fragment: nil)
-        ),
-        GameClient(
             id: "bundled:1.8.8-wasm",
             name: "1.8.8-wasm",
             source: .bundled(resource: "1.8.8-wasm", fileExtension: "html", query: nil, fragment: nil),
             note: "If stuck on integrated server, cancel and run single-thread"
-        ),
-        GameClient(
-            id: "bundled:1.21.11-wasm",
-            name: "1.21.11-wasm",
-            source: .bundled(resource: "1.21.11-wasm", fileExtension: "html", query: nil, fragment: nil)
         ),
         GameClient(
             id: "bundled:reVCDOS",

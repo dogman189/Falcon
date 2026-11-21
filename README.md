@@ -5,9 +5,7 @@ Falcon is a native iOS (SwiftUI) launcher/wrapper for bundled Eaglercraft-style 
 ## Features
 
 - **Bundled clients**
-  - `Eaglet`
   - `1.8.8-wasm`
-  - `1.21.11-wasm`
   - `reVCDOS` — offline HTML5 port of GTA: Vice City (assets bundled; no network needed)
 - **Custom clients**: import a single `.html` client file from Files and launch it from the selector
 - **Immersive web view**: browser-chrome-free `WKWebView` surface tuned for gameplay
