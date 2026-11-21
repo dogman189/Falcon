@@ -22,7 +22,15 @@ enum ReVCDOSHTTPResponder {
         rootURL: URL,
         fileManager: FileManager = .default
     ) -> ReVCDOSHTTPResponse {
-        let effectivePath = path == "/" ? "/dist/index.html" : path
+        let pathOnly = path.split(separator: "?", maxSplits: 1).first.map(String.init) ?? path
+        let effectivePath: String
+        if pathOnly == "/" {
+            effectivePath = "/dist/index.html"
+        } else if pathOnly.hasPrefix("/vcbr/") || pathOnly.hasPrefix("/vcsky/") {
+            effectivePath = pathOnly
+        } else {
+            effectivePath = "/dist" + pathOnly
+        }
         guard let fileURL = ReVCDOSAssetManifest.resolvedFileURL(for: effectivePath, in: rootURL),
               let data = fileManager.contents(atPath: fileURL.path) else {
             return ReVCDOSHTTPResponse(

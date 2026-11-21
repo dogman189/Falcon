@@ -11,6 +11,10 @@ func testBrotliResponseHeaders() {
     try? FileManager.default.createDirectory(at: vcbr, withIntermediateDirectories: true)
     let payload = Data("brotli-payload".utf8)
     try? payload.write(to: vcbr.appendingPathComponent("test.data.br"))
+    let dist = root.appendingPathComponent("dist", isDirectory: true)
+    try? FileManager.default.createDirectory(at: dist, withIntermediateDirectories: true)
+    try? Data("index".utf8).write(to: dist.appendingPathComponent("index.html"))
+    try? Data("game".utf8).write(to: dist.appendingPathComponent("game.js"))
 
     let parsed = ReVCDOSHTTPResponder.parseRequestLine("GET /vcbr/test.data.br HTTP/1.1")
     assert(parsed?.method == "GET")
@@ -26,6 +30,19 @@ func testBrotliResponseHeaders() {
     assert(header("Content-Type", in: response) == "application/octet-stream")
     assert(header("Cross-Origin-Opener-Policy", in: response) == "same-origin")
     assert(header("Cross-Origin-Embedder-Policy", in: response) == "require-corp")
+
+    let rootResponse = ReVCDOSHTTPResponder.response(
+        method: "GET", path: "/?fullscreen=0&lang=en", rootURL: root
+    )
+    assert(rootResponse.status == 200)
+    assert(rootResponse.body == Data("index".utf8))
+
+    let clientFile = ReVCDOSHTTPResponder.response(
+        method: "GET", path: "/game.js", rootURL: root
+    )
+    assert(clientFile.status == 200)
+    assert(clientFile.body == Data("game".utf8))
+    assert(header("Content-Type", in: clientFile) == "text/javascript")
 
     let missing = ReVCDOSHTTPResponder.response(
         method: "GET", path: "/nope", rootURL: root
