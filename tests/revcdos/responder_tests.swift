@@ -4,6 +4,21 @@ func header(_ name: String, in response: ReVCDOSHTTPResponse) -> String? {
     response.headers.first(where: { $0.0.caseInsensitiveCompare(name) == .orderedSame })?.1
 }
 
+func testVCSKYPathServedFromBundleRoot() {
+    let root = makeTempRoot()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let vcsky = root.appendingPathComponent("vcsky", isDirectory: true)
+    try? FileManager.default.createDirectory(at: vcsky, withIntermediateDirectories: true)
+    try? Data("fixture".utf8).write(to: vcsky.appendingPathComponent("sha256sums.txt"))
+
+    let response = ReVCDOSHTTPResponder.response(
+        method: "GET", path: "/vcsky/sha256sums.txt", rootURL: root
+    )
+    assert(response.status == 200)
+    assert(response.body == Data("fixture".utf8))
+    assert(header("Content-Type", in: response) == "text/plain")
+}
+
 func testBrotliResponseHeaders() {
     let root = makeTempRoot()
     defer { try? FileManager.default.removeItem(at: root) }

@@ -6,6 +6,7 @@ func runTests() {
     testBundledClientDefinition()
     testPreflightReportsMissingBinary()
     testPreflightAllowsCompleteBundle()
+    testVCSKYPathServedFromBundleRoot()
     testBrotliResponseHeaders()
     testServerErrorDescribesItself()
     do {
