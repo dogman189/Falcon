@@ -24,16 +24,25 @@ struct ContentView: View {
     @State private var showingCoverFileImporter = false
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var coverRevision = 0
+    @State private var reVCDOSServer: ReVCDOSLocalServer?
+    @State private var webViewIdentity = 0
 
     var body: some View {
         Group {
             if let selectedClient {
                 if let clientFailure {
                     failureView(for: selectedClient, message: clientFailure)
-                } else if let fileURL = selectedClient.url {
-                    EaglerWebView(content: .file(fileURL), snapshotter: snapshotter) { message in
+                } else if let clientURL = selectedClient.url {
+                    let webContent: FalconWebContent = {
+                        if case .localServer = selectedClient.source {
+                            return .localServer(baseURL: clientURL)
+                        }
+                        return .file(clientURL)
+                    }()
+                    EaglerWebView(content: webContent, snapshotter: snapshotter) { message in
                         clientFailure = message
                     }
+                    .id(webViewIdentity)
                     .ignoresSafeArea()
                     .background(.black)
                     .overlay(alignment: .topLeading) {
@@ -65,6 +74,10 @@ struct ContentView: View {
         }
         .onChange(of: selectedClient) { _, _ in
             hideQuit()
+            if selectedClient == nil {
+                reVCDOSServer?.stop()
+                reVCDOSServer = nil
+            }
             OrientationLock.shared.portraitOnly = (selectedClient == nil)
         }
         .task {
@@ -161,7 +174,7 @@ struct ContentView: View {
 
             HStack(spacing: 12) {
                 Button("Try again") {
-                    clientFailure = nil
+                    retryCurrentClient()
                 }
                 .buttonStyle(.borderedProminent)
 
@@ -219,8 +232,7 @@ struct ContentView: View {
 
                     ForEach(GameClient.bundled) { client in
                         Button {
-                            clientFailure = nil
-                            selectedClient = client
+                            selectClient(client)
                         } label: {
                             SelectorRow(client: client, cover: coverImage(for: client))
                         }
@@ -248,8 +260,7 @@ struct ContentView: View {
                     } else {
                         ForEach(customClients) { client in
                             Button {
-                                clientFailure = nil
-                                selectedClient = client
+                                selectClient(client)
                             } label: {
                                 SelectorRow(client: client, cover: coverImage(for: client))
                             }
@@ -297,8 +308,42 @@ struct ContentView: View {
         }) else {
             return
         }
-        selectedClient = client
+        selectClient(client)
         #endif
+    }
+
+    private func selectClient(_ client: GameClient) {
+        clientFailure = nil
+        reVCDOSServer?.stop()
+        reVCDOSServer = nil
+
+        if case .localServer = client.source {
+            guard let rootURL = ReVCDOSAssetManifest.bundleRootURL() else {
+                clientFailure = "The offline game bundle could not be located."
+                return
+            }
+            let missing = ReVCDOSAssetManifest.missingAssets(in: rootURL)
+            if !missing.isEmpty {
+                clientFailure = "Missing game files: \(missing.joined(separator: ", "))"
+                return
+            }
+            let server = ReVCDOSLocalServer(rootURL: rootURL)
+            do {
+                try server.start()
+            } catch {
+                clientFailure = "Could not start the local game server: \(error.localizedDescription)"
+                return
+            }
+            reVCDOSServer = server
+        }
+
+        selectedClient = client
+    }
+
+    private func retryCurrentClient() {
+        guard let client = selectedClient else { return }
+        webViewIdentity += 1
+        selectClient(client)
     }
 
     private func loadClients() {
@@ -325,6 +370,8 @@ struct ContentView: View {
     private func removeCustomClient(_ client: GameClient) {
         guard client.isCustom else { return }
         if selectedClient?.id == client.id {
+            reVCDOSServer?.stop()
+            reVCDOSServer = nil
             selectedClient = nil
             clientFailure = nil
         }
@@ -342,6 +389,8 @@ struct ContentView: View {
                     coverRevision += 1
                 }
                 clientFailure = nil
+                reVCDOSServer?.stop()
+                reVCDOSServer = nil
                 selectedClient = nil
             }
         }
