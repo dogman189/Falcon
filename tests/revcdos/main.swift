@@ -4,7 +4,10 @@ func runTests() {
     testResolvedFileURLRejectsTraversal()
     testContentTypeAndBrotliRules()
     testBundledClientDefinition()
+    testPreflightReportsMissingBinary()
+    testPreflightAllowsCompleteBundle()
     testBrotliResponseHeaders()
+    testServerErrorDescribesItself()
     do {
         try testServerAppliesHeadersOverHTTP()
         try testStartThrowsWhenPortUnavailable()

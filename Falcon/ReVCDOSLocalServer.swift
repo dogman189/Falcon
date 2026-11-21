@@ -5,6 +5,14 @@ enum ReVCDOSLocalServerError: Error {
     case startFailed(String)
 }
 
+extension ReVCDOSLocalServerError: LocalizedError {
+    var errorDescription: String? {
+        switch self {
+        case .startFailed(let message): return message
+        }
+    }
+}
+
 final class ReVCDOSLocalServer {
     private let rootURL: URL
     private let port: UInt16

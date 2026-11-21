@@ -34,6 +34,10 @@ func testServerAppliesHeadersOverHTTP() throws {
     assert(result.1?.value(forHTTPHeaderField: "Cross-Origin-Embedder-Policy") == "require-corp")
 }
 
+func testServerErrorDescribesItself() {
+    assert(ReVCDOSLocalServerError.startFailed("port busy").localizedDescription == "port busy")
+}
+
 func testStartThrowsWhenPortUnavailable() throws {
     let first = ReVCDOSLocalServer(rootURL: makeTempRoot(), port: 18192)
     try first.start()

@@ -29,10 +29,10 @@ struct ContentView: View {
 
     var body: some View {
         Group {
-            if let selectedClient {
-                if let clientFailure {
-                    failureView(for: selectedClient, message: clientFailure)
-                } else if let clientURL = selectedClient.url {
+            if let clientFailure {
+                failureView(title: selectedClient?.name ?? "Client", message: clientFailure)
+            } else if let selectedClient {
+                if let clientURL = selectedClient.url {
                     let webContent: FalconWebContent = {
                         if case .localServer = selectedClient.source {
                             return .localServer(baseURL: clientURL)
@@ -64,7 +64,7 @@ struct ContentView: View {
                     }
                 } else {
                     failureView(
-                        for: selectedClient,
+                        title: selectedClient.name,
                         message: "The bundled file for \(selectedClient.name) is missing."
                     )
                 }
@@ -158,13 +158,13 @@ struct ContentView: View {
         quitRevealed = false
     }
 
-    private func failureView(for client: GameClient, message: String) -> some View {
+    private func failureView(title: String, message: String) -> some View {
         VStack(spacing: 18) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 44))
                 .foregroundStyle(.yellow)
 
-            Text("\(client.name) stopped")
+            Text("\(title) stopped")
                 .font(.title2.bold())
 
             Text(message)
@@ -316,15 +316,16 @@ struct ContentView: View {
         clientFailure = nil
         reVCDOSServer?.stop()
         reVCDOSServer = nil
+        // Set the client first so a pre-flight failure still has context for
+        // the failure view and for "Try again".
+        selectedClient = client
 
         if case .localServer = client.source {
-            guard let rootURL = ReVCDOSAssetManifest.bundleRootURL() else {
-                clientFailure = "The offline game bundle could not be located."
-                return
-            }
-            let missing = ReVCDOSAssetManifest.missingAssets(in: rootURL)
-            if !missing.isEmpty {
-                clientFailure = "Missing game files: \(missing.joined(separator: ", "))"
+            let preflight = ReVCDOSLaunchPreflight.check(
+                rootURL: ReVCDOSAssetManifest.bundleRootURL()
+            )
+            guard preflight.canLaunch, let rootURL = preflight.rootURL else {
+                clientFailure = preflight.errorMessage
                 return
             }
             let server = ReVCDOSLocalServer(rootURL: rootURL)
@@ -336,8 +337,6 @@ struct ContentView: View {
             }
             reVCDOSServer = server
         }
-
-        selectedClient = client
     }
 
     private func retryCurrentClient() {
