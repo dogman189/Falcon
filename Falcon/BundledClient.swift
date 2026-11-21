@@ -3,6 +3,7 @@ import Foundation
 struct GameClient: Identifiable, Hashable {
     enum Source: Hashable {
         case bundled(resource: String, fileExtension: String, query: String?, fragment: String?)
+        case localServer(root: String)
         case custom(fileURL: URL)
     }
 
@@ -29,6 +30,8 @@ struct GameClient: Identifiable, Hashable {
             default:
                 return "ClientCover-Custom"
             }
+        case .localServer:
+            return "ClientCover-ReVCDOS"
         case .custom:
             return "ClientCover-Custom"
         }
@@ -56,6 +59,8 @@ struct GameClient: Identifiable, Hashable {
                 components.percentEncodedFragment = fragment
             }
             return components.url ?? baseURL
+        case .localServer:
+            return ReVCDOSAssetManifest.launchURL
         case let .custom(fileURL):
             return fileURL
         }
@@ -77,6 +82,12 @@ struct GameClient: Identifiable, Hashable {
             id: "bundled:1.21.11-wasm",
             name: "1.21.11-wasm",
             source: .bundled(resource: "1.21.11-wasm", fileExtension: "html", query: nil, fragment: nil)
+        ),
+        GameClient(
+            id: "bundled:reVCDOS",
+            name: "reVCDOS",
+            source: .localServer(root: "reVCDOS"),
+            note: "GTA: Vice City — offline HTML5 port"
         ),
     ]
 

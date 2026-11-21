@@ -31,7 +31,7 @@ struct ContentView: View {
                 if let clientFailure {
                     failureView(for: selectedClient, message: clientFailure)
                 } else if let fileURL = selectedClient.url {
-                    EaglerWebView(fileURL: fileURL, snapshotter: snapshotter) { message in
+                    EaglerWebView(content: .file(fileURL), snapshotter: snapshotter) { message in
                         clientFailure = message
                     }
                     .ignoresSafeArea()

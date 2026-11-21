@@ -3,6 +3,7 @@ func runTests() {
     testMissingAssetsReportsBinaries()
     testResolvedFileURLRejectsTraversal()
     testContentTypeAndBrotliRules()
+    testBundledClientDefinition()
     testBrotliResponseHeaders()
     do {
         try testServerAppliesHeadersOverHTTP()

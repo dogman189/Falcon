@@ -27,6 +27,13 @@ func testResolvedFileURLRejectsTraversal() {
     assert(ReVCDOSAssetManifest.resolvedFileURL(for: "/dist/index.html", in: root)?.lastPathComponent == "index.html")
 }
 
+func testBundledClientDefinition() {
+    let client = GameClient.bundled.first { $0.id == "bundled:reVCDOS" }
+    assert(client != nil)
+    assert(client?.url == ReVCDOSAssetManifest.launchURL)
+    assert(client?.defaultCoverImageName == "ClientCover-ReVCDOS")
+}
+
 func testContentTypeAndBrotliRules() {
     assert(ReVCDOSAssetManifest.contentType(for: "a.wasm.br") == "application/wasm")
     assert(ReVCDOSAssetManifest.contentType(for: "a.js") == "text/javascript")

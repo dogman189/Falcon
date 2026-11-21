@@ -15,9 +15,14 @@ final class WebViewSnapshotter {
     }
 }
 
+enum FalconWebContent {
+    case file(URL)
+    case localServer(baseURL: URL)
+}
+
 /// Immersive wrapper that loads a selected bundled client in a browser-chrome-free WKWebView.
 struct EaglerWebView: UIViewRepresentable {
-    let fileURL: URL
+    let content: FalconWebContent
     var snapshotter: WebViewSnapshotter?
     var onFailure: (String) -> Void
 
@@ -50,7 +55,7 @@ struct EaglerWebView: UIViewRepresentable {
         #endif
 
         snapshotter?.webView = webView
-        loadSelectedClient(in: webView)
+        loadContent(in: webView)
         return webView
     }
 
@@ -58,17 +63,26 @@ struct EaglerWebView: UIViewRepresentable {
         snapshotter?.webView = uiView
     }
 
-    private func loadSelectedClient(in webView: WKWebView) {
-        guard FileManager.default.fileExists(atPath: fileURL.path) else {
-            assertionFailure("Missing bundled resource: \(fileURL.lastPathComponent)")
-            let message = "<html><body style='background:#000;color:#fff;font-family:-apple-system'>Missing bundled client: \(fileURL.lastPathComponent)</body></html>"
-            webView.loadHTMLString(message, baseURL: nil)
-            return
+    private func loadContent(in webView: WKWebView) {
+        switch content {
+        case let .file(fileURL):
+            guard FileManager.default.fileExists(atPath: fileURL.path) else {
+                assertionFailure("Missing bundled resource: \(fileURL.lastPathComponent)")
+                let message = "<html><body style='background:#000;color:#fff;font-family:-apple-system'>Missing bundled client: \(fileURL.lastPathComponent)</body></html>"
+                webView.loadHTMLString(message, baseURL: nil)
+                return
+            }
+            #if DEBUG
+            NSLog("[Falcon] Loading %@", fileURL.absoluteString)
+            #endif
+            webView.loadFileURL(fileURL, allowingReadAccessTo: fileURL.deletingLastPathComponent())
+        case let .localServer(baseURL):
+            webView.customUserAgent = "Mozilla/5.0 (iPad; CPU OS 27_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.2 Mobile/15E148 Safari/604.1"
+            #if DEBUG
+            NSLog("[Falcon] Loading local server %@", baseURL.absoluteString)
+            #endif
+            webView.load(URLRequest(url: baseURL))
         }
-        #if DEBUG
-        NSLog("[Falcon] Loading %@", fileURL.absoluteString)
-        #endif
-        webView.loadFileURL(fileURL, allowingReadAccessTo: fileURL.deletingLastPathComponent())
     }
 
     final class Coordinator: NSObject, WKNavigationDelegate {
