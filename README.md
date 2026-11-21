@@ -24,6 +24,16 @@ Falcon is a native iOS (SwiftUI) launcher/wrapper for bundled Eaglercraft-style 
 - `reVCDOS` is served from a small in-app loopback server on `localhost:8199` so the game's brotli-compressed assets and cross-origin-isolation headers work offline. If that port is occupied, the failure screen will say so.
 - The reVCDOS HTML5 port is MIT licensed, copyright DOS Zone and Lolendor; it is not affiliated with Rockstar Games. This app is for personal use only.
 
+## Optional vcsky assets
+
+The reVCDOS game runs without the upstream `vcsky` assets. To include them (~1.5 GB expanded):
+
+1. Run `Scripts/prepare-vcsky.sh` once from the repo root. It downloads the upstream archive and extracts `vcsky/` into the repo root (gitignored). It is safe to re-run.
+2. In the Falcon target's Build Settings, set `FALCON_BUNDLE_VCSKY` to `YES`.
+3. Rebuild. The copy phase places the assets at `reVCDOS/vcsky/` in the app bundle, where the local server already serves `/vcsky/...` requests.
+
+The option is `NO` by default. Building with it `YES` before preparing assets fails with a message pointing at the preparation script.
+
 ## Project structure
 
 - `Falcon/` — SwiftUI app source, web view wrapper, bundled client definitions, and bundled client HTML files
