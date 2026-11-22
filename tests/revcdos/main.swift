@@ -7,6 +7,7 @@ func runTests() {
     testPreflightReportsMissingBinary()
     testPreflightAllowsCompleteBundle()
     testVCSKYPathServedFromBundleRoot()
+    do { try testAssetStoreReadiness() } catch { fatalError("asset store test failed: \(error)") }
     testBrotliResponseHeaders()
     testServerErrorDescribesItself()
     do {
