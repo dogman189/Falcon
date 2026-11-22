@@ -6,7 +6,7 @@ Falcon is a native iOS (SwiftUI) launcher/wrapper for bundled Eaglercraft-style 
 
 - **Bundled clients**
   - `1.8.8-wasm`
-  - `reVCDOS` — offline HTML5 port of GTA: Vice City (assets bundled; no network needed)
+  - `reVCDOS` — HTML5 port of GTA: Vice City; game data is downloaded once, then played offline
 - **Custom clients**: import a single `.html` client file from Files and launch it from the selector
 - **Immersive web view**: browser-chrome-free `WKWebView` surface tuned for gameplay
 - **Client covers**:
@@ -24,15 +24,16 @@ Falcon is a native iOS (SwiftUI) launcher/wrapper for bundled Eaglercraft-style 
 - `reVCDOS` is served from a small in-app loopback server on `localhost:8199` so the game's brotli-compressed assets and cross-origin-isolation headers work offline. If that port is occupied, the failure screen will say so.
 - The reVCDOS HTML5 port is MIT licensed, copyright DOS Zone and Lolendor; it is not affiliated with Rockstar Games. This app is for personal use only.
 
-## Optional vcsky assets
+## reVCDOS game data
 
-The reVCDOS game runs without the upstream `vcsky` assets. To include them (~1.5 GB expanded):
+The app ships without the game data. On first launch, reVCDOS shows a download sheet:
 
-1. Run `Scripts/prepare-vcsky.sh` once from the repo root. It downloads the upstream archive and extracts `vcsky/` into the repo root (gitignored). It is safe to re-run.
-2. In the Falcon target's Build Settings, set `FALCON_BUNDLE_VCSKY` to `YES`.
-3. Rebuild. The copy phase places the assets at `reVCDOS/vcsky/` in the app bundle, where the local server already serves `/vcsky/...` requests.
+- The download is about **1.08 GB** (the upstream packed archive) and needs roughly **1.5 GB** of free space. Use WiFi.
+- Falcon extracts the four game files into Application Support, where they survive app updates.
+- An interrupted download resumes on the next attempt; the assets are only marked ready when all four files are present.
+- You can also start it from the reVCDOS tile's context menu: **Download full assets…**.
 
-The option is `NO` by default. Building with it `YES` before preparing assets fails with a message pointing at the preparation script.
+Once downloaded, the game runs fully offline through the local server on `localhost:8199`.
 
 ## Project structure
 
