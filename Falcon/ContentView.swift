@@ -321,9 +321,8 @@ struct ContentView: View {
         selectedClient = client
 
         if case .localServer = client.source {
-            let preflight = ReVCDOSLaunchPreflight.check(
-                rootURL: ReVCDOSAssetManifest.bundleRootURL()
-            )
+            let rootURL = ReVCDOSAssetManifest.serveRoot()
+            let preflight = ReVCDOSLaunchPreflight.check(rootURL: rootURL)
             guard preflight.canLaunch, let rootURL = preflight.rootURL else {
                 clientFailure = preflight.errorMessage
                 return

@@ -98,6 +98,15 @@ final class ReVCDOSAssetDownloader {
                     finish(.failure(DownloadError.incompleteArchive))
                     return
                 }
+                if let bundleDist = ReVCDOSAssetManifest.bundleRootURL(fileManager: self.fileManager)?
+                    .appendingPathComponent("dist"),
+                   self.fileManager.fileExists(atPath: bundleDist.path) {
+                    let localDist = root.appendingPathComponent("dist")
+                    if self.fileManager.fileExists(atPath: localDist.path) {
+                        try self.fileManager.removeItem(at: localDist)
+                    }
+                    try self.fileManager.copyItem(at: bundleDist, to: localDist)
+                }
                 try ReVCDOSAssetStore.markReady(at: root, fileManager: self.fileManager)
                 try? self.fileManager.removeItem(at: resumeURL)
                 try? self.fileManager.removeItem(at: root.appendingPathComponent("extract"))

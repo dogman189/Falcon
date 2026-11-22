@@ -19,6 +19,23 @@ func testVCSKYPathServedFromBundleRoot() {
     assert(header("Content-Type", in: response) == "text/plain")
 }
 
+func testServerRootSelection() throws {
+    let root = makeTempRoot()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let bundle = root.appendingPathComponent("bundle", isDirectory: true)
+    let downloaded = root.appendingPathComponent("downloaded", isDirectory: true)
+    try? FileManager.default.createDirectory(at: bundle, withIntermediateDirectories: true)
+    try? FileManager.default.createDirectory(at: downloaded, withIntermediateDirectories: true)
+    assert(ReVCDOSAssetManifest.serveRoot(bundleRoot: bundle, downloadedRoot: downloaded) == bundle)
+    for name in ReVCDOSAssetStore.assetNames {
+        let file = downloaded.appendingPathComponent("vcbr").appendingPathComponent(name)
+        try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("x".utf8).write(to: file)
+    }
+    try ReVCDOSAssetStore.markReady(at: downloaded)
+    assert(ReVCDOSAssetManifest.serveRoot(bundleRoot: bundle, downloadedRoot: downloaded) == downloaded)
+}
+
 func testBrotliResponseHeaders() {
     let root = makeTempRoot()
     defer { try? FileManager.default.removeItem(at: root) }

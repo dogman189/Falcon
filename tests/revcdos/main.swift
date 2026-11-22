@@ -7,6 +7,7 @@ func runTests() {
     testPreflightReportsMissingBinary()
     testPreflightAllowsCompleteBundle()
     testVCSKYPathServedFromBundleRoot()
+    do { try testServerRootSelection() } catch { fatalError("root selection test failed: \(error)") }
     do { try testAssetStoreReadiness() } catch { fatalError("asset store test failed: \(error)") }
     do { try testArchiveExtractsVcbrFiles() } catch { fatalError("archive test failed: \(error)") }
     testArchiveTruncatedThrows()

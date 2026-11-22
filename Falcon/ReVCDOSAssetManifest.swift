@@ -19,6 +19,19 @@ enum ReVCDOSAssetManifest {
         Bundle.main.resourceURL?.appendingPathComponent(rootDirectoryName, isDirectory: true)
     }
 
+    static func serveRoot(
+        bundleRoot: URL? = nil,
+        downloadedRoot: URL? = nil,
+        fileManager: FileManager = .default
+    ) -> URL {
+        let bundle = bundleRoot ?? bundleRootURL(fileManager: fileManager)
+        let downloaded = downloadedRoot ?? ReVCDOSAssetStore.rootURL(fileManager: fileManager)
+        if let downloaded, ReVCDOSAssetStore.isReady(at: downloaded, fileManager: fileManager) {
+            return downloaded
+        }
+        return bundle ?? downloaded ?? URL(fileURLWithPath: NSTemporaryDirectory())
+    }
+
     static func missingAssets(in rootURL: URL, fileManager: FileManager = .default) -> [String] {
         requiredRelativePaths.filter { path in
             !fileManager.fileExists(atPath: rootURL.appendingPathComponent(path).path)
