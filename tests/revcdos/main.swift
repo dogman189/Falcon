@@ -8,6 +8,8 @@ func runTests() {
     testPreflightAllowsCompleteBundle()
     testVCSKYPathServedFromBundleRoot()
     do { try testAssetStoreReadiness() } catch { fatalError("asset store test failed: \(error)") }
+    do { try testArchiveExtractsVcbrFiles() } catch { fatalError("archive test failed: \(error)") }
+    testArchiveTruncatedThrows()
     testBrotliResponseHeaders()
     testServerErrorDescribesItself()
     do {
