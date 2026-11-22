@@ -26,6 +26,10 @@ enum ReVCDOSAssetStore {
         }
     }
 
+    static func shouldPromptForDownload(at root: URL, fileManager: FileManager = .default) -> Bool {
+        !isReady(at: root, fileManager: fileManager)
+    }
+
     static func markReady(at root: URL, fileManager: FileManager = .default) throws {
         try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
         let marker = root.appendingPathComponent(markerName)

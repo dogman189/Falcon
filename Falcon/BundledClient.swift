@@ -73,7 +73,7 @@ struct GameClient: Identifiable, Hashable {
             id: "bundled:reVCDOS",
             name: "reVCDOS",
             source: .localServer(root: "reVCDOS"),
-            note: "GTA: Vice City — offline HTML5 port"
+            note: "GTA: Vice City — download assets once, then play offline"
         ),
     ]
 

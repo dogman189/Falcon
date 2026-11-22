@@ -26,12 +26,16 @@ struct ContentView: View {
     @State private var coverRevision = 0
     @State private var reVCDOSServer: ReVCDOSLocalServer?
     @State private var webViewIdentity = 0
+    @State private var showingAssetDownload = false
+    @State private var downloadProgress = 0.0
+    @State private var downloadErrorMessage: String?
+    @State private var downloader = ReVCDOSAssetDownloader()
 
     var body: some View {
         Group {
             if let clientFailure {
                 failureView(title: selectedClient?.name ?? "Client", message: clientFailure)
-            } else if let selectedClient {
+            } else if let selectedClient, !showingAssetDownload {
                 if let clientURL = selectedClient.url {
                     let webContent: FalconWebContent = {
                         if case .localServer = selectedClient.source {
@@ -111,6 +115,36 @@ struct ContentView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(importErrorMessage ?? "Unknown error.")
+        }
+        .sheet(isPresented: $showingAssetDownload) {
+            VStack(spacing: 18) {
+                Text("Download reVCDOS assets")
+                    .font(.title2.bold())
+                Text("The game data is about 1.08 GB to download and needs around 1.5 GB free. Use WiFi, then you can play offline.")
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.secondary)
+                ProgressView(value: downloadProgress)
+                    .progressViewStyle(.linear)
+                if let downloadErrorMessage {
+                    Text(downloadErrorMessage)
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                }
+                HStack(spacing: 12) {
+                    Button("Cancel") {
+                        downloader.cancel()
+                        showingAssetDownload = false
+                    }
+                    .buttonStyle(.bordered)
+                    Button(downloader.isDownloading ? "Downloading…" : "Download") {
+                        startAssetDownload()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(downloader.isDownloading)
+                }
+            }
+            .padding(32)
+            .frame(minWidth: 420)
         }
     }
 
@@ -241,6 +275,14 @@ struct ContentView: View {
                         .id("\(client.id)-\(coverRevision)")
                         .contextMenu {
                             coverMenuItems(for: client)
+                            if client.id == "bundled:reVCDOS" {
+                                Button {
+                                    downloadErrorMessage = nil
+                                    showingAssetDownload = true
+                                } label: {
+                                    Label("Download full assets…", systemImage: "arrow.down.circle")
+                                }
+                            }
                         }
                         .padding(.horizontal, 24)
                     }
@@ -321,6 +363,12 @@ struct ContentView: View {
         selectedClient = client
 
         if case .localServer = client.source {
+            if let assetRoot = ReVCDOSAssetStore.rootURL(),
+               ReVCDOSAssetStore.shouldPromptForDownload(at: assetRoot) {
+                downloadErrorMessage = nil
+                showingAssetDownload = true
+                return
+            }
             let rootURL = ReVCDOSAssetManifest.serveRoot()
             let preflight = ReVCDOSLaunchPreflight.check(rootURL: rootURL)
             guard preflight.canLaunch, let rootURL = preflight.rootURL else {
@@ -336,6 +384,27 @@ struct ContentView: View {
             }
             reVCDOSServer = server
         }
+    }
+
+    private func startAssetDownload() {
+        downloadErrorMessage = nil
+        downloadProgress = 0
+        downloader.download(
+            progress: { value in
+                downloadProgress = value
+            },
+            completion: { result in
+                switch result {
+                case .success:
+                    showingAssetDownload = false
+                    if let client = selectedClient {
+                        selectClient(client)
+                    }
+                case .failure(let error):
+                    downloadErrorMessage = error.localizedDescription
+                }
+            }
+        )
     }
 
     private func retryCurrentClient() {
