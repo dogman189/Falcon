@@ -9,6 +9,11 @@ func testDownloaderStoresAssetsOnSuccess() throws {
         ("vcbr", ReVCDOSAssetStore.assetNames.map { ($0, "DATA-\($0)") }),
     ])
     try archive.write(to: served.appendingPathComponent("archive.bin"))
+    let fakeDist = served.appendingPathComponent("dist", isDirectory: true)
+    try FileManager.default.createDirectory(at: fakeDist, withIntermediateDirectories: true)
+    for name in ["index.html", "index.js", "game.js"] {
+        try Data("x".utf8).write(to: fakeDist.appendingPathComponent(name))
+    }
 
     let proc = Process()
     proc.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
@@ -21,6 +26,7 @@ func testDownloaderStoresAssetsOnSuccess() throws {
     let downloader = ReVCDOSAssetDownloader(
         archiveURL: URL(string: "http://127.0.0.1:18317/archive.bin")!,
         destinationRoot: dest,
+        distSourceURL: fakeDist,
         callbackQueue: .global()
     )
     var progress: [Double] = []

@@ -7,9 +7,11 @@ final class ReVCDOSAssetDownloader {
     private let fileManager: FileManager
     private let archiveURL: URL
     private let destinationRoot: URL?
+    private let distSourceURL: URL?
     private let callbackQueue: DispatchQueue
     private let stateLock = NSLock()
     private var currentTask: URLSessionDownloadTask?
+    private var activeRoot: URL?
     private var _isDownloading = false
 
     var isDownloading: Bool {
@@ -22,12 +24,14 @@ final class ReVCDOSAssetDownloader {
         fileManager: FileManager = .default,
         archiveURL: URL = ReVCDOSAssetDownloader.defaultArchiveURL,
         destinationRoot: URL? = nil,
+        distSourceURL: URL? = nil,
         callbackQueue: DispatchQueue = .main
     ) {
         self.session = session
         self.fileManager = fileManager
         self.archiveURL = archiveURL
         self.destinationRoot = destinationRoot
+        self.distSourceURL = distSourceURL
         self.callbackQueue = callbackQueue
     }
 
@@ -50,23 +54,38 @@ final class ReVCDOSAssetDownloader {
         }
         try? fileManager.createDirectory(at: root, withIntermediateDirectories: true)
 
+        // Any new attempt invalidates the current install immediately.
+        ReVCDOSAssetStore.clearMarker(at: root, fileManager: fileManager)
+        let staging = root.appendingPathComponent("staging", isDirectory: true)
+        if fileManager.fileExists(atPath: staging.path) {
+            try? fileManager.removeItem(at: staging)
+        }
+        try? fileManager.createDirectory(at: staging, withIntermediateDirectories: true)
+
         let resumeURL = root.appendingPathComponent(".download-resume")
-        stateLock.lock(); _isDownloading = true; stateLock.unlock()
+        stateLock.lock()
+        _isDownloading = true
+        activeRoot = root
+        stateLock.unlock()
 
         let finish: (Result<Void, Error>) -> Void = { result in
             self.stateLock.lock()
             self._isDownloading = false
             let finishedTask = self.currentTask
             self.currentTask = nil
+            self.activeRoot = nil
             self.stateLock.unlock()
             if let finishedTask { ProgressObserver.detach(finishedTask) }
+            if case .failure = result {
+                try? self.fileManager.removeItem(at: staging)
+            }
             self.callbackQueue.async { completion(result) }
         }
 
         let handler: (URL?, URLResponse?, Error?) -> Void = { location, _, error in
             if let error {
                 if let resumeData = (error as NSError).userInfo[NSURLSessionDownloadTaskResumeData] as? Data {
-                    try? resumeData.write(to: resumeURL)
+                    self.storeResumeData(resumeData, root: root)
                 }
                 finish(.failure(error))
                 return
@@ -78,38 +97,44 @@ final class ReVCDOSAssetDownloader {
             do {
                 let extracted = try ReVCDOSPackedArchive.extractVcbrBRFiles(
                     from: location,
-                    to: root.appendingPathComponent("extract", isDirectory: true),
+                    to: staging.appendingPathComponent("extract", isDirectory: true),
                     fileManager: self.fileManager
                 )
-                let vcbr = root.appendingPathComponent("vcbr", isDirectory: true)
-                if self.fileManager.fileExists(atPath: vcbr.path) {
-                    try self.fileManager.removeItem(at: vcbr)
-                }
-                try self.fileManager.createDirectory(at: vcbr, withIntermediateDirectories: true)
+                let stagedVcbr = staging.appendingPathComponent("vcbr", isDirectory: true)
+                try self.fileManager.createDirectory(at: stagedVcbr, withIntermediateDirectories: true)
                 for file in extracted {
                     try self.fileManager.copyItem(
                         at: file,
-                        to: vcbr.appendingPathComponent(file.lastPathComponent)
+                        to: stagedVcbr.appendingPathComponent(file.lastPathComponent)
                     )
                 }
                 guard ReVCDOSAssetStore.assetNames.allSatisfy({ name in
-                    self.fileManager.fileExists(atPath: vcbr.appendingPathComponent(name).path)
+                    self.fileManager.fileExists(atPath: stagedVcbr.appendingPathComponent(name).path)
                 }) else {
                     finish(.failure(DownloadError.incompleteArchive))
                     return
                 }
-                if let bundleDist = ReVCDOSAssetManifest.bundleRootURL(fileManager: self.fileManager)?
-                    .appendingPathComponent("dist"),
-                   self.fileManager.fileExists(atPath: bundleDist.path) {
-                    let localDist = root.appendingPathComponent("dist")
-                    if self.fileManager.fileExists(atPath: localDist.path) {
-                        try self.fileManager.removeItem(at: localDist)
+
+                let stagedDist = staging.appendingPathComponent("dist", isDirectory: true)
+                let sourceDist = self.distSourceURL ?? ReVCDOSAssetManifest.bundleRootURL(fileManager: self.fileManager)?
+                    .appendingPathComponent("dist")
+                if let sourceDist, self.fileManager.fileExists(atPath: sourceDist.path) {
+                    try self.fileManager.copyItem(at: sourceDist, to: stagedDist)
+                }
+
+                for folder in ["vcbr", "dist"] {
+                    let target = root.appendingPathComponent(folder, isDirectory: true)
+                    if self.fileManager.fileExists(atPath: target.path) {
+                        try self.fileManager.removeItem(at: target)
                     }
-                    try self.fileManager.copyItem(at: bundleDist, to: localDist)
+                    try self.fileManager.moveItem(
+                        at: staging.appendingPathComponent(folder, isDirectory: true),
+                        to: target
+                    )
                 }
                 try ReVCDOSAssetStore.markReady(at: root, fileManager: self.fileManager)
                 try? self.fileManager.removeItem(at: resumeURL)
-                try? self.fileManager.removeItem(at: root.appendingPathComponent("extract"))
+                try? self.fileManager.removeItem(at: staging)
                 finish(.success(()))
             } catch {
                 finish(.failure(error))
@@ -130,8 +155,17 @@ final class ReVCDOSAssetDownloader {
     func cancel() {
         stateLock.lock()
         let task = currentTask
+        let root = activeRoot
         stateLock.unlock()
-        task?.cancel()
+        guard let task else { return }
+        task.cancel { resumeData in
+            guard let root, let resumeData else { return }
+            self.storeResumeData(resumeData, root: root)
+        }
+    }
+
+    func storeResumeData(_ data: Data, root: URL) {
+        try? data.write(to: root.appendingPathComponent(".download-resume"))
     }
 
     enum DownloadError: Error {

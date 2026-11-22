@@ -4,6 +4,7 @@ enum ReVCDOSPackedArchiveError: Error {
     case truncated
     case unexpectedFolderType(UInt8)
     case unexpectedFileType(UInt8)
+    case unsupportedDeduplicatedEntry
 }
 
 enum ReVCDOSPackedArchive {
@@ -70,6 +71,9 @@ enum ReVCDOSPackedArchive {
             }
 
             if folderType == 1 { // copy folder: source name string, no files
+                if folderName == "vcbr" {
+                    throw ReVCDOSPackedArchiveError.unsupportedDeduplicatedEntry
+                }
                 guard let sourceLen = try readULEB() else { throw ReVCDOSPackedArchiveError.truncated }
                 try skip(sourceLen)
                 continue
@@ -87,6 +91,9 @@ enum ReVCDOSPackedArchive {
 
                 guard fileType == 0 else {
                     if fileType == 1 { // reference: source folder + source name
+                        if folderName == "vcbr" && name.hasSuffix(".br") {
+                            throw ReVCDOSPackedArchiveError.unsupportedDeduplicatedEntry
+                        }
                         guard let fLen = try readULEB() else { throw ReVCDOSPackedArchiveError.truncated }
                         try skip(fLen)
                         guard let nLen = try readULEB() else { throw ReVCDOSPackedArchiveError.truncated }

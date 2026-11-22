@@ -32,6 +32,11 @@ func testServerRootSelection() throws {
         try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Data("x".utf8).write(to: file)
     }
+    for name in ["index.html", "index.js", "game.js"] {
+        let file = downloaded.appendingPathComponent("dist").appendingPathComponent(name)
+        try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("x".utf8).write(to: file)
+    }
     try ReVCDOSAssetStore.markReady(at: downloaded)
     assert(ReVCDOSAssetManifest.serveRoot(bundleRoot: bundle, downloadedRoot: downloaded) == downloaded)
 }

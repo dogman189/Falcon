@@ -116,7 +116,12 @@ struct ContentView: View {
         } message: {
             Text(importErrorMessage ?? "Unknown error.")
         }
-        .sheet(isPresented: $showingAssetDownload) {
+        .sheet(isPresented: $showingAssetDownload, onDismiss: {
+            // Never leave a selected client with no server behind the sheet.
+            if ReVCDOSAssetStore.rootURL().map({ ReVCDOSAssetStore.shouldPromptForDownload(at: $0) }) ?? false {
+                selectedClient = nil
+            }
+        }) {
             VStack(spacing: 18) {
                 Text("Download reVCDOS assets")
                     .font(.title2.bold())
@@ -145,6 +150,7 @@ struct ContentView: View {
             }
             .padding(32)
             .frame(minWidth: 420)
+            .interactiveDismissDisabled(true)
         }
     }
 
@@ -278,6 +284,7 @@ struct ContentView: View {
                             if client.id == "bundled:reVCDOS" {
                                 Button {
                                     downloadErrorMessage = nil
+                                    downloadProgress = 0
                                     showingAssetDownload = true
                                 } label: {
                                     Label("Download full assets…", systemImage: "arrow.down.circle")

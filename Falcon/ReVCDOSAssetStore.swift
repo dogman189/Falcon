@@ -9,6 +9,7 @@ enum ReVCDOSAssetStore {
     ]
 
     private static let markerName = ".assets-ready"
+    private static let distNames = ["index.html", "index.js", "game.js"]
 
     static func rootURL(fileManager: FileManager = .default) -> URL? {
         guard let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
@@ -21,8 +22,19 @@ enum ReVCDOSAssetStore {
         guard fileManager.fileExists(atPath: root.appendingPathComponent(markerName).path) else {
             return false
         }
-        return assetNames.allSatisfy { name in
+        let vcbrReady = assetNames.allSatisfy { name in
             fileManager.fileExists(atPath: root.appendingPathComponent("vcbr").appendingPathComponent(name).path)
+        }
+        let distReady = distNames.allSatisfy { name in
+            fileManager.fileExists(atPath: root.appendingPathComponent("dist").appendingPathComponent(name).path)
+        }
+        return vcbrReady && distReady
+    }
+
+    static func clearMarker(at root: URL, fileManager: FileManager = .default) {
+        let marker = root.appendingPathComponent(markerName)
+        if fileManager.fileExists(atPath: marker.path) {
+            try? fileManager.removeItem(at: marker)
         }
     }
 
