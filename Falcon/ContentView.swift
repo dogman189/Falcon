@@ -28,8 +28,11 @@ struct ContentView: View {
     @State private var webViewIdentity = 0
     @State private var showingAssetDownload = false
     @State private var downloadProgress = 0.0
+    @State private var downloadStatus = "Ready to download"
     @State private var downloadErrorMessage: String?
+    @State private var assetDownloadInFlight = false
     @State private var downloader = ReVCDOSAssetDownloader()
+    @State private var showingDeleteAssetsConfirmation = false
 
     var body: some View {
         Group {
@@ -116,6 +119,14 @@ struct ContentView: View {
         } message: {
             Text(importErrorMessage ?? "Unknown error.")
         }
+        .confirmationDialog("Delete downloaded reVCDOS assets?", isPresented: $showingDeleteAssetsConfirmation, titleVisibility: .visible) {
+            Button("Delete Assets", role: .destructive) {
+                deleteDownloadedAssets()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This removes the downloaded game data from this device. You can download it again later.")
+        }
         .sheet(isPresented: $showingAssetDownload, onDismiss: {
             // Never leave a selected client with no server behind the sheet.
             if ReVCDOSAssetStore.rootURL().map({ ReVCDOSAssetStore.shouldPromptForDownload(at: $0) }) ?? false {
@@ -125,11 +136,17 @@ struct ContentView: View {
             VStack(spacing: 18) {
                 Text("Download reVCDOS assets")
                     .font(.title2.bold())
-                Text("The game data is about 1.08 GB to download and needs around 1.5 GB free. Use WiFi, then you can play offline.")
+                Text("The game data is about 1.08 GB to download and needs around 3 GB free during install. Use WiFi, then you can play offline.")
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)
-                ProgressView(value: downloadProgress)
-                    .progressViewStyle(.linear)
+                VStack(alignment: .leading, spacing: 8) {
+                    ProgressView(value: max(0, min(downloadProgress, 1)))
+                        .progressViewStyle(.linear)
+                        .frame(maxWidth: .infinity)
+                    Text(downloadStatus)
+                        .font(.footnote.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
                 if let downloadErrorMessage {
                     Text(downloadErrorMessage)
                         .font(.footnote)
@@ -138,14 +155,16 @@ struct ContentView: View {
                 HStack(spacing: 12) {
                     Button("Cancel") {
                         downloader.cancel()
+                        assetDownloadInFlight = false
+                        downloadStatus = "Cancelled"
                         showingAssetDownload = false
                     }
                     .buttonStyle(.bordered)
-                    Button(downloader.isDownloading ? "Downloading…" : "Download") {
+                    Button(assetDownloadInFlight ? "Downloading…" : "Download") {
                         startAssetDownload()
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(downloader.isDownloading)
+                    .disabled(assetDownloadInFlight)
                 }
             }
             .padding(32)
@@ -233,43 +252,9 @@ struct ContentView: View {
     }
 
     private var clientSelector: some View {
-        ZStack {
-            Color(.systemBackground)
-                .ignoresSafeArea()
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(alignment: .top) {
-                        Text("Select a client to launch")
-                            .font(.title3.weight(.medium))
-
-                        Spacer()
-
-                        Button {
-                            showingFileImporter = true
-                        } label: {
-                            Label("Add Client", systemImage: "plus")
-                                .font(.subheadline.weight(.semibold))
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 10)
-                                .background(Color.cyan.opacity(0.18))
-                                .overlay(
-                                    Capsule().stroke(Color.cyan.opacity(0.45), lineWidth: 1)
-                                )
-                                .clipShape(Capsule())
-                        }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(.cyan)
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.top, 8)
-
-                    Text("BUNDLED")
-                        .font(.caption.weight(.bold))
-                        .kerning(1.2)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 24)
-
+        NavigationStack {
+            List {
+                Section("BUNDLED") {
                     ForEach(GameClient.bundled) { client in
                         Button {
                             selectClient(client)
@@ -285,27 +270,29 @@ struct ContentView: View {
                                 Button {
                                     downloadErrorMessage = nil
                                     downloadProgress = 0
+                                    downloadStatus = "Ready to download"
                                     showingAssetDownload = true
                                 } label: {
                                     Label("Download full assets…", systemImage: "arrow.down.circle")
                                 }
+                                if let root = ReVCDOSAssetStore.rootURL(),
+                                   ReVCDOSAssetStore.isReady(at: root) {
+                                    Button(role: .destructive) {
+                                        showingDeleteAssetsConfirmation = true
+                                    } label: {
+                                        Label("Delete downloaded assets", systemImage: "trash")
+                                    }
+                                }
                             }
                         }
-                        .padding(.horizontal, 24)
                     }
+                }
 
-                    Text("CUSTOM")
-                        .font(.caption.weight(.bold))
-                        .kerning(1.2)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 24)
-
+                Section {
                     if customClients.isEmpty {
                         Text("No custom clients yet. Add a single .html client file from Files.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
-                            .padding(.horizontal, 24)
-                            .padding(.vertical, 6)
                     } else {
                         ForEach(customClients) { client in
                             Button {
@@ -324,21 +311,24 @@ struct ContentView: View {
                                     Label("Remove Client", systemImage: "trash")
                                 }
                             }
-                            .padding(.horizontal, 24)
                         }
                     }
-
+                } header: {
+                    Text("CUSTOM")
+                } footer: {
                     Text("Swipe down in the top-left corner to reveal Quit. 1.8.8-wasm may need single-thread if it hangs starting the integrated server.")
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.horizontal, 24)
-                        .padding(.top, 4)
-                        .padding(.bottom, 12)
                 }
-                .padding(.vertical, 28)
-                .frame(maxWidth: 900, alignment: .leading)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .listStyle(.insetGrouped)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showingFileImporter = true
+                    } label: {
+                        Label("Add Client", systemImage: "plus")
+                    }
+                }
             }
         }
     }
@@ -373,6 +363,8 @@ struct ContentView: View {
             if let assetRoot = ReVCDOSAssetStore.rootURL(),
                ReVCDOSAssetStore.shouldPromptForDownload(at: assetRoot) {
                 downloadErrorMessage = nil
+                downloadProgress = 0
+                downloadStatus = "Ready to download"
                 showingAssetDownload = true
                 return
             }
@@ -382,7 +374,10 @@ struct ContentView: View {
                 clientFailure = preflight.errorMessage
                 return
             }
-            let server = ReVCDOSLocalServer(rootURL: rootURL)
+            let server = ReVCDOSLocalServer(
+                rootURL: rootURL,
+                fallbackRootURL: ReVCDOSAssetManifest.bundleRootURL()
+            )
             do {
                 try server.start()
             } catch {
@@ -393,22 +388,49 @@ struct ContentView: View {
         }
     }
 
+    private func deleteDownloadedAssets() {
+        reVCDOSServer?.stop()
+        reVCDOSServer = nil
+        if let root = ReVCDOSAssetStore.rootURL() {
+            try? ReVCDOSAssetStore.clear(at: root)
+        }
+        downloadProgress = 0
+        downloadStatus = "Ready to download"
+        downloadErrorMessage = nil
+        assetDownloadInFlight = false
+    }
+
     private func startAssetDownload() {
         downloadErrorMessage = nil
         downloadProgress = 0
+        downloadStatus = "Starting download…"
+        assetDownloadInFlight = true
         downloader.download(
             progress: { value in
-                downloadProgress = value
+                downloadProgress = max(0, min(value, 1))
+                if value < 1 {
+                    downloadStatus = "Downloading… \(Int((max(0, min(value, 1)) * 100).rounded()))%"
+                }
+            },
+            status: { value in
+                downloadStatus = value
             },
             completion: { result in
+                assetDownloadInFlight = false
                 switch result {
                 case .success:
+                    downloadStatus = "Done"
                     showingAssetDownload = false
                     if let client = selectedClient {
                         selectClient(client)
                     }
                 case .failure(let error):
-                    downloadErrorMessage = error.localizedDescription
+                    if (error as NSError).code == NSURLErrorCancelled {
+                        downloadStatus = "Cancelled"
+                    } else {
+                        downloadErrorMessage = error.localizedDescription
+                        downloadStatus = "Download failed"
+                    }
                 }
             }
         )
