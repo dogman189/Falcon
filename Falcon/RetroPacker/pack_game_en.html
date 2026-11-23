@@ -1378,10 +1378,14 @@ function setStep(stepName, state) {
 }
 function setProgress(pct) {
   progressFill.style.width = pct + '%';
+  // FalconBridge:hook-progress
+  window.FalconBridge?.onProgress(pct);
 }
 function showError(msg) {
   errorBanner.textContent = msg;
   errorBanner.classList.add('visible');
+  // FalconBridge:hook-error
+  window.FalconBridge?.onError(msg);
 }
 function hideError() { errorBanner.classList.remove('visible'); }
 function hideDownload() {
@@ -1730,6 +1734,9 @@ generateBtn.addEventListener('click', async () => {
     generatedBlobUrl = URL.createObjectURL(blob);
     generatedFilename = outputName;
 
+    // FalconBridge:hook-complete
+    window.FalconBridge?.onComplete(html, generatedFilename);
+
     downloadBtn.textContent = `💾 Download ${outputName}`;
     downloadInfo.textContent = `${sysInfo.label} • ${title} • ${formatSize(blob.size)} • 🛡️ 100% hors-ligne (3-layer offline)`;
     downloadSection.classList.add('visible');
@@ -1752,6 +1759,8 @@ generateBtn.addEventListener('click', async () => {
 // ============================================================
 downloadBtn.addEventListener('click', () => {
   if (!generatedBlobUrl) return;
+  // FalconBridge:hook-download — Falcon reads the HTML from the bridge message instead.
+  if (window.FalconBridge?.suppressDownload()) return;
   const a = document.createElement('a');
   a.href = generatedBlobUrl;
   a.download = generatedFilename;
@@ -1760,6 +1769,10 @@ downloadBtn.addEventListener('click', () => {
   document.body.removeChild(a);
 });
 </script>
+
+<!-- FalconBridge:begin -->
+<script src="RetroPackerBridge.js"></script>
+<!-- FalconBridge:end -->
 
 </body>
 </html>
