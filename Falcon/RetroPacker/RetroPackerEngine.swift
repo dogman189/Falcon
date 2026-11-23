@@ -234,14 +234,23 @@ extension RetroPackerEngine: WKNavigationDelegate {
         }
     }
 
+    private func detailedErrorMessage(_ error: Error) -> String {
+        let nsError = error as NSError
+        if nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled {
+            return "Loading was cancelled."
+        }
+        let detail = nsError.localizedDescription
+        return "Load failed: \(detail) (\(nsError.domain) \(nsError.code))"
+    }
+
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
         guard webView === _webView else { return }
-        resetWebView(reportingError: error.localizedDescription)
+        resetWebView(reportingError: detailedErrorMessage(error))
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         guard webView === _webView else { return }
-        resetWebView(reportingError: error.localizedDescription)
+        resetWebView(reportingError: detailedErrorMessage(error))
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
