@@ -20,7 +20,7 @@ The upstream commit above is the most recent commit touching `docs/pack_game_en.
 
 ## License
 
-Upstream is MIT licensed: https://github.com/aciderix/portable-retro-games/blob/main/LICENSE — Copyright (c) 2026 Aciderixx. The MIT copyright and permission notice must be retained in any redistribution of the vendored source.
+Upstream is MIT licensed. The full notice is vendored verbatim in [`LICENSE`](LICENSE) (upstream: https://github.com/aciderix/portable-retro-games/blob/main/LICENSE; Copyright (c) 2026 Aciiderixx; upstream blob SHA-1 `40b931024b4a04fd9b641251cf7eb131ccd4bbb4`). The MIT copyright and permission notice must accompany copies or substantial portions of the vendored source — include `LICENSE` in the app's third-party notices/About screen when this resource is bundled.
 
 ## Integration rules
 
