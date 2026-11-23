@@ -140,6 +140,12 @@ final class RetroPackerEngine: NSObject, WKScriptMessageHandler {
 
     func handleScriptMessage(_ message: WKScriptMessage) {
         guard message.name == "falconRetroPacker" else { return }
+        if let dict = message.body as? [String: Any],
+           let type = dict["type"] as? String,
+           type == "fetch" {
+            handleFetchRequest(dict)
+            return
+        }
         guard let event = RetroPackerBridgeParser.parse(message.body) else { return }
 
         switch event {
@@ -165,6 +171,65 @@ final class RetroPackerEngine: NSObject, WKScriptMessageHandler {
             currentRequestID = nil
             onError?(messageText)
         }
+    }
+
+    private func handleFetchRequest(_ dict: [String: Any]) {
+        guard let id = dict["id"] as? String,
+              let urlString = dict["url"] as? String,
+              let mode = dict["mode"] as? String,
+              let url = URL(string: urlString),
+              let host = url.host,
+              host == "cdn.emulatorjs.org",
+              url.scheme == "https" else {
+            let id = dict["id"] as? String ?? ""
+            if !id.isEmpty { rejectFetch(id: id, message: "Blocked fetch request.") }
+            return
+        }
+
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                var request = URLRequest(url: url)
+                request.timeoutInterval = 120
+                let (data, response) = try await URLSession.shared.data(for: request)
+                let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+                guard (200...299).contains(status) else {
+                    self.resolveFetch(id: id, ok: false, status: status, data: "")
+                    return
+                }
+                let payload: String
+                if mode == "binary" {
+                    payload = data.base64EncodedString()
+                } else {
+                    payload = String(data: data, encoding: .utf8) ?? String(decoding: data, as: UTF8.self)
+                }
+                self.resolveFetch(id: id, ok: true, status: status, data: payload)
+            } catch {
+                self.rejectFetch(id: id, message: error.localizedDescription)
+            }
+        }
+    }
+
+    private func resolveFetch(id: String, ok: Bool, status: Int, data: String) {
+        guard let webView = _webView else { return }
+        let args: [String: Any] = ["id": id, "ok": ok, "status": status, "data": data]
+        webView.callAsyncJavaScript(
+            "window.FalconRetroPacker._resolveFetch(id, {ok: ok, status: status, data: data});",
+            arguments: args,
+            in: nil,
+            in: .page
+        ) { _ in }
+    }
+
+    private func rejectFetch(id: String, message: String) {
+        guard let webView = _webView else { return }
+        let args: [String: Any] = ["id": id, "message": message]
+        webView.callAsyncJavaScript(
+            "window.FalconRetroPacker._rejectFetch(id, message);",
+            arguments: args,
+            in: nil,
+            in: .page
+        ) { _ in }
     }
 
     // MARK: - Internals

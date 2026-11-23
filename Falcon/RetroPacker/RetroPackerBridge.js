@@ -184,6 +184,76 @@
     }
   }
 
+  // Native fetch proxy: WKWebView file:// contexts can fail to fetch https CDN
+  // resources on device ("Load failed"). Proxy cdn.emulatorjs.org requests
+  // through native URLSession when running inside Falcon.
+  var nextFetchId = 0;
+  var pendingFetches = Object.create(null);
+
+  function resolveFetch(id, payload) {
+    var entry = pendingFetches[id];
+    if (!entry) return;
+    delete pendingFetches[id];
+    entry.resolve(payload);
+  }
+
+  function rejectFetch(id, message) {
+    var entry = pendingFetches[id];
+    if (!entry) return;
+    delete pendingFetches[id];
+    entry.reject(new Error(message || 'Native fetch failed.'));
+  }
+
+  function nativeFetch(url, mode) {
+    return new Promise(function (resolve, reject) {
+      var id = 'f' + (++nextFetchId);
+      pendingFetches[id] = { resolve: resolve, reject: reject };
+      post({ type: 'fetch', id: id, url: String(url), mode: mode });
+    });
+  }
+
+  function installNativeFetchProxy() {
+    if (!suppressDownload()) return;
+    if (typeof window.fetchText === 'function') {
+      var origFetchText = window.fetchText;
+      window.fetchText = async function (url) {
+        if (typeof url === 'string' && url.indexOf('https://cdn.emulatorjs.org/') === 0) {
+          try {
+            var res = await nativeFetch(url, 'text');
+            if (res && res.ok) { console.log('📦 Native:', url); return res.data; }
+            if (res && res.status) throw new Error('Failed to download ' + url + ' (HTTP ' + res.status + ')');
+          } catch (e) {
+            console.warn('[FalconRetroPacker] Native text fetch failed, falling back:', e);
+          }
+        }
+        return origFetchText(url);
+      };
+    }
+    if (typeof window.fetchBinary === 'function') {
+      var origFetchBinary = window.fetchBinary;
+      window.fetchBinary = async function (url) {
+        if (typeof url === 'string' && url.indexOf('https://cdn.emulatorjs.org/') === 0) {
+          try {
+            var res = await nativeFetch(url, 'binary');
+            if (res && res.ok) {
+              console.log('📦 Native:', url);
+              var binary = atob(res.data);
+              var bytes = new Uint8Array(binary.length);
+              for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+              return bytes.buffer;
+            }
+            if (res && res.status) throw new Error('Failed to download ' + url + ' (HTTP ' + res.status + ')');
+          } catch (e) {
+            console.warn('[FalconRetroPacker] Native binary fetch failed, falling back:', e);
+          }
+        }
+        return origFetchBinary(url);
+      };
+    }
+  }
+
+  installNativeFetchProxy();
+
   window.FalconBridge = {
     // FalconBridge:hooks — called by the marked hooks in pack_game_en.html.
     onProgress: onProgress,
@@ -194,6 +264,8 @@
 
   window.FalconRetroPacker = {
     // FalconBridge:api — called by RetroPackerEngine (native side).
-    pack: pack
+    pack: pack,
+    _resolveFetch: resolveFetch,
+    _rejectFetch: rejectFetch
   };
 })();
