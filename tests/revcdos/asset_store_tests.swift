@@ -16,6 +16,9 @@ func testAssetStoreReadiness() throws {
         try Data("x".utf8).write(to: file)
     }
     assert(!ReVCDOSAssetStore.isReady(at: root), "marker not yet written")
+    let vcsky = root.appendingPathComponent("vcsky", isDirectory: true)
+    try? FileManager.default.createDirectory(at: vcsky, withIntermediateDirectories: true)
+    try Data("sums".utf8).write(to: vcsky.appendingPathComponent("sha256sums.txt"))
     try ReVCDOSAssetStore.markReady(at: root)
     assert(ReVCDOSAssetStore.isReady(at: root))
 

@@ -67,6 +67,9 @@ func testReadinessIncludesDist() throws {
         try? FileManager.default.createDirectory(at: f.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Data("x".utf8).write(to: f)
     }
+    let vcsky = root.appendingPathComponent("vcsky", isDirectory: true)
+    try? FileManager.default.createDirectory(at: vcsky, withIntermediateDirectories: true)
+    try Data("sums".utf8).write(to: vcsky.appendingPathComponent("sha256sums.txt"))
     assert(ReVCDOSAssetStore.isReady(at: root))
 }
 
@@ -83,6 +86,9 @@ func testFailedRedownloadClearsMarker() throws {
         try? FileManager.default.createDirectory(at: f.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Data("old".utf8).write(to: f)
     }
+    let vcsky = root.appendingPathComponent("vcsky", isDirectory: true)
+    try? FileManager.default.createDirectory(at: vcsky, withIntermediateDirectories: true)
+    try Data("sums".utf8).write(to: vcsky.appendingPathComponent("sha256sums.txt"))
     try ReVCDOSAssetStore.markReady(at: root)
     assert(ReVCDOSAssetStore.isReady(at: root))
 

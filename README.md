@@ -28,9 +28,9 @@ Falcon is a native iOS (SwiftUI) launcher/wrapper for bundled Eaglercraft-style 
 
 The app ships without the game data. On first launch, reVCDOS shows a download sheet:
 
-- The download is about **1.08 GB** (the upstream packed archive) and needs roughly **1.5 GB** of free space. Use WiFi.
-- Falcon extracts the four game files into Application Support, where they survive app updates.
-- An interrupted download resumes on the next attempt; the assets are only marked ready when all four files are present.
+- The download is about **1.08 GB** (the upstream packed archive) and needs roughly **3 GB** of free space during install. Use WiFi.
+- Falcon extracts the game files (including `vcsky` audio/data assets) into Application Support, where they survive app updates.
+- An interrupted download resumes on the next attempt; the assets are only marked ready when all required files are present.
 - You can also start it from the reVCDOS tile's context menu: **Download full assets…**.
 
 Once downloaded, the game runs fully offline through the local server on `localhost:8199`.

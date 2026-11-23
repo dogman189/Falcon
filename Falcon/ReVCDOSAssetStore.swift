@@ -28,7 +28,10 @@ enum ReVCDOSAssetStore {
         let distReady = distNames.allSatisfy { name in
             fileManager.fileExists(atPath: root.appendingPathComponent("dist").appendingPathComponent(name).path)
         }
-        return vcbrReady && distReady
+        let vcskyReady = fileManager.fileExists(
+            atPath: root.appendingPathComponent("vcsky").appendingPathComponent("sha256sums.txt").path
+        )
+        return vcbrReady && distReady && vcskyReady
     }
 
     static func clearMarker(at root: URL, fileManager: FileManager = .default) {

@@ -1,4 +1,22 @@
 import Foundation
+import Compression
+
+func brotliCompressForTest(_ data: Data) -> Data {
+    let dstCapacity = max(data.count + 64, 128)
+    var dst = Data(count: dstCapacity)
+    let written: Int = dst.withUnsafeMutableBytes { dstBuf -> Int in
+        data.withUnsafeBytes { srcBuf -> Int in
+            guard let dstBase = dstBuf.baseAddress?.assumingMemoryBound(to: UInt8.self),
+                  let srcBase = srcBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return 0 }
+            return compression_encode_buffer(dstBase, dstCapacity, srcBase, data.count, nil, COMPRESSION_BROTLI)
+        }
+    }
+    if written > 0 {
+        dst.count = written
+        return dst
+    }
+    return data
+}
 
 func uleb(_ value: Int) -> [UInt8] {
     var v = value
@@ -24,9 +42,10 @@ func makeArchive(folders: [(name: String, files: [(name: String, data: String)])
             d.append(contentsOf: uleb(file.name.utf8.count))
             d.append(contentsOf: file.name.utf8)
             d.append(0) // file type content
-            let bytes = Array(file.data.utf8)
+            let raw = Data(file.data.utf8)
+            let bytes: Data = file.name.lowercased().hasSuffix(".br") ? raw : brotliCompressForTest(raw)
             d.append(contentsOf: uleb(bytes.count))
-            d.append(contentsOf: bytes)
+            d.append(bytes)
         }
     }
     return d
@@ -51,7 +70,10 @@ func testArchiveExtractsVcbrFiles() throws {
         let content = String(data: try Data(contentsOf: url), encoding: .utf8)
         assert(content == (url.lastPathComponent.contains("data") ? "DATA1" : "DATA2"))
     }
-    assert(!FileManager.default.fileExists(atPath: dest.appendingPathComponent("sha256sums.txt").path))
+    let vcskySums = dest.appendingPathComponent("vcsky").appendingPathComponent("sha256sums.txt")
+    assert(FileManager.default.fileExists(atPath: vcskySums.path))
+    let sums = String(data: try Data(contentsOf: vcskySums), encoding: .utf8)
+    assert(sums == "skip")
 }
 
 func testArchiveTruncatedThrows() {

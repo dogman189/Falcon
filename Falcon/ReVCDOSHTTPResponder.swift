@@ -20,6 +20,7 @@ enum ReVCDOSHTTPResponder {
         method: String,
         path: String,
         rootURL: URL,
+        fallbackRootURL: URL? = nil,
         fileManager: FileManager = .default
     ) -> ReVCDOSHTTPResponse {
         let pathOnly = path.split(separator: "?", maxSplits: 1).first.map(String.init) ?? path
@@ -31,7 +32,11 @@ enum ReVCDOSHTTPResponder {
         } else {
             effectivePath = "/dist" + pathOnly
         }
-        guard let fileURL = ReVCDOSAssetManifest.resolvedFileURL(for: effectivePath, in: rootURL),
+        let fileURL = ReVCDOSAssetManifest.resolvedFileURL(for: effectivePath, in: rootURL)
+            .flatMap { fileManager.contents(atPath: $0.path) != nil ? $0 : nil }
+            ?? fallbackRootURL.flatMap { ReVCDOSAssetManifest.resolvedFileURL(for: effectivePath, in: $0) }
+                .flatMap { fileManager.contents(atPath: $0.path) != nil ? $0 : nil }
+        guard let fileURL,
               let data = fileManager.contents(atPath: fileURL.path) else {
             return ReVCDOSHTTPResponse(
                 status: 404,

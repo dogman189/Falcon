@@ -7,6 +7,7 @@ func testDownloaderStoresAssetsOnSuccess() throws {
     try FileManager.default.createDirectory(at: served, withIntermediateDirectories: true)
     let archive = makeArchive(folders: [
         ("vcbr", ReVCDOSAssetStore.assetNames.map { ($0, "DATA-\($0)") }),
+        ("vcsky", [("sha256sums.txt", "sums")]),
     ])
     try archive.write(to: served.appendingPathComponent("archive.bin"))
     let fakeDist = served.appendingPathComponent("dist", isDirectory: true)

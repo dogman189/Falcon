@@ -37,6 +37,9 @@ func testServerRootSelection() throws {
         try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Data("x".utf8).write(to: file)
     }
+    let vcsky = downloaded.appendingPathComponent("vcsky", isDirectory: true)
+    try? FileManager.default.createDirectory(at: vcsky, withIntermediateDirectories: true)
+    try Data("sums".utf8).write(to: vcsky.appendingPathComponent("sha256sums.txt"))
     try ReVCDOSAssetStore.markReady(at: downloaded)
     assert(ReVCDOSAssetManifest.serveRoot(bundleRoot: bundle, downloadedRoot: downloaded) == downloaded)
 }

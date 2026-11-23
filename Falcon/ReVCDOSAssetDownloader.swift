@@ -11,6 +11,7 @@ final class ReVCDOSAssetDownloader {
     private let callbackQueue: DispatchQueue
     private let stateLock = NSLock()
     private var currentTask: URLSessionDownloadTask?
+    private var currentSession: URLSession?
     private var activeRoot: URL?
     private var _isDownloading = false
 
@@ -37,6 +38,7 @@ final class ReVCDOSAssetDownloader {
 
     func download(
         progress: @escaping (Double) -> Void,
+        status: @escaping (String) -> Void = { _ in },
         completion: @escaping (Result<Void, Error>) -> Void
     ) {
         guard !isDownloading else {
@@ -71,11 +73,12 @@ final class ReVCDOSAssetDownloader {
         let finish: (Result<Void, Error>) -> Void = { result in
             self.stateLock.lock()
             self._isDownloading = false
-            let finishedTask = self.currentTask
             self.currentTask = nil
+            let finishedSession = self.currentSession
+            self.currentSession = nil
             self.activeRoot = nil
             self.stateLock.unlock()
-            if let finishedTask { ProgressObserver.detach(finishedTask) }
+            finishedSession?.finishTasksAndInvalidate()
             if case .failure = result {
                 try? self.fileManager.removeItem(at: staging)
             }
@@ -95,18 +98,28 @@ final class ReVCDOSAssetDownloader {
                 return
             }
             do {
-                let extracted = try ReVCDOSPackedArchive.extractVcbrBRFiles(
+                self.callbackQueue.async { status("Extracting…"); progress(1.0) }
+                let extractRoot = staging.appendingPathComponent("extract", isDirectory: true)
+                let extracted = try ReVCDOSPackedArchive.extract(
                     from: location,
-                    to: staging.appendingPathComponent("extract", isDirectory: true),
+                    to: extractRoot,
                     fileManager: self.fileManager
                 )
                 let stagedVcbr = staging.appendingPathComponent("vcbr", isDirectory: true)
-                try self.fileManager.createDirectory(at: stagedVcbr, withIntermediateDirectories: true)
-                for file in extracted {
-                    try self.fileManager.copyItem(
-                        at: file,
-                        to: stagedVcbr.appendingPathComponent(file.lastPathComponent)
-                    )
+                if self.fileManager.fileExists(atPath: stagedVcbr.path) {
+                    try self.fileManager.removeItem(at: stagedVcbr)
+                }
+                let extractedVcbr = extractRoot.appendingPathComponent("vcbr", isDirectory: true)
+                if self.fileManager.fileExists(atPath: extractedVcbr.path) {
+                    try self.fileManager.moveItem(at: extractedVcbr, to: stagedVcbr)
+                } else {
+                    try self.fileManager.createDirectory(at: stagedVcbr, withIntermediateDirectories: true)
+                    for file in extracted.vcbr {
+                        try self.fileManager.moveItem(
+                            at: file,
+                            to: stagedVcbr.appendingPathComponent(file.lastPathComponent)
+                        )
+                    }
                 }
                 guard ReVCDOSAssetStore.assetNames.allSatisfy({ name in
                     self.fileManager.fileExists(atPath: stagedVcbr.appendingPathComponent(name).path)
@@ -119,18 +132,30 @@ final class ReVCDOSAssetDownloader {
                 let sourceDist = self.distSourceURL ?? ReVCDOSAssetManifest.bundleRootURL(fileManager: self.fileManager)?
                     .appendingPathComponent("dist")
                 if let sourceDist, self.fileManager.fileExists(atPath: sourceDist.path) {
+                    if self.fileManager.fileExists(atPath: stagedDist.path) {
+                        try self.fileManager.removeItem(at: stagedDist)
+                    }
                     try self.fileManager.copyItem(at: sourceDist, to: stagedDist)
                 }
 
-                for folder in ["vcbr", "dist"] {
+                let extractedVcsky = extractRoot.appendingPathComponent("vcsky", isDirectory: true)
+                let stagedVcsky = staging.appendingPathComponent("vcsky", isDirectory: true)
+                if self.fileManager.fileExists(atPath: extractedVcsky.path) {
+                    if self.fileManager.fileExists(atPath: stagedVcsky.path) {
+                        try self.fileManager.removeItem(at: stagedVcsky)
+                    }
+                    try self.fileManager.moveItem(at: extractedVcsky, to: stagedVcsky)
+                }
+
+                self.callbackQueue.async { status("Installing…") }
+                for folder in ["vcbr", "dist", "vcsky"] {
+                    let staged = staging.appendingPathComponent(folder, isDirectory: true)
                     let target = root.appendingPathComponent(folder, isDirectory: true)
+                    guard self.fileManager.fileExists(atPath: staged.path) else { continue }
                     if self.fileManager.fileExists(atPath: target.path) {
                         try self.fileManager.removeItem(at: target)
                     }
-                    try self.fileManager.moveItem(
-                        at: staging.appendingPathComponent(folder, isDirectory: true),
-                        to: target
-                    )
+                    try self.fileManager.moveItem(at: staged, to: target)
                 }
                 try ReVCDOSAssetStore.markReady(at: root, fileManager: self.fileManager)
                 try? self.fileManager.removeItem(at: resumeURL)
@@ -141,14 +166,18 @@ final class ReVCDOSAssetDownloader {
             }
         }
 
+        let delegate = DownloadProgressDelegate(progress: progress, queue: callbackQueue)
+        let downloadSession = URLSession(configuration: session.configuration, delegate: delegate, delegateQueue: nil)
         let task: URLSessionDownloadTask
         if let resumeData = try? Data(contentsOf: resumeURL) {
-            task = session.downloadTask(withResumeData: resumeData, completionHandler: handler)
+            task = downloadSession.downloadTask(withResumeData: resumeData, completionHandler: handler)
         } else {
-            task = session.downloadTask(with: archiveURL, completionHandler: handler)
+            task = downloadSession.downloadTask(with: archiveURL, completionHandler: handler)
         }
-        stateLock.lock(); currentTask = task; stateLock.unlock()
-        ProgressObserver.attach(to: task, progress: progress, queue: callbackQueue)
+        stateLock.lock()
+        currentTask = task
+        currentSession = downloadSession
+        stateLock.unlock()
         task.resume()
     }
 
@@ -175,22 +204,24 @@ final class ReVCDOSAssetDownloader {
     }
 }
 
-private final class ProgressObserver {
-    private static let lock = NSLock()
-    private static var observers: [URLSessionDownloadTask: ProgressObserver] = [:]
-    private var observation: NSKeyValueObservation?
+private final class DownloadProgressDelegate: NSObject, URLSessionDownloadDelegate {
+    let progress: (Double) -> Void
+    let queue: DispatchQueue
 
-    static func attach(to task: URLSessionDownloadTask, progress: @escaping (Double) -> Void, queue: DispatchQueue) {
-        let progressCall = progress
-        let observer = ProgressObserver()
-        observer.observation = task.progress.observe(\.fractionCompleted, options: [.initial, .new]) { observed, _ in
-            let fraction = observed.fractionCompleted
-            queue.async { progressCall(fraction) }
+    init(progress: @escaping (Double) -> Void, queue: DispatchQueue) {
+        self.progress = progress
+        self.queue = queue
+    }
+
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
+        let fraction = downloadTask.progress.fractionCompleted
+        if fraction.isFinite && fraction >= 0 {
+            queue.async { self.progress(min(max(fraction, 0), 1)) }
+        } else if totalBytesExpectedToWrite > 0 {
+            let writtenFraction = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
+            queue.async { self.progress(min(max(writtenFraction, 0), 1)) }
         }
-        lock.lock(); observers[task] = observer; lock.unlock()
     }
 
-    static func detach(_ task: URLSessionDownloadTask) {
-        lock.lock(); observers[task] = nil; lock.unlock()
-    }
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {}
 }

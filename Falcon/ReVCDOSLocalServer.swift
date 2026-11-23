@@ -15,13 +15,15 @@ extension ReVCDOSLocalServerError: LocalizedError {
 
 final class ReVCDOSLocalServer {
     private let rootURL: URL
+    private let fallbackRootURL: URL?
     private let port: UInt16
     private let queue = DispatchQueue(label: "revcdos.local.server")
     private var listeners: [NWListener] = []
     private(set) var isRunning = false
 
-    init(rootURL: URL, port: UInt16 = ReVCDOSAssetManifest.port) {
+    init(rootURL: URL, fallbackRootURL: URL? = nil, port: UInt16 = ReVCDOSAssetManifest.port) {
         self.rootURL = rootURL
+        self.fallbackRootURL = fallbackRootURL
         self.port = port
     }
 
@@ -121,7 +123,7 @@ final class ReVCDOSLocalServer {
                 let response: ReVCDOSHTTPResponse
                 if let parsed = ReVCDOSHTTPResponder.parseRequestLine(firstLine) {
                     response = ReVCDOSHTTPResponder.response(
-                        method: parsed.method, path: parsed.path, rootURL: rootURL
+                        method: parsed.method, path: parsed.path, rootURL: rootURL, fallbackRootURL: fallbackRootURL
                     )
                 } else {
                     response = ReVCDOSHTTPResponse(
