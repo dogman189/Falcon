@@ -24,9 +24,11 @@ final class GameControllerManager: ObservableObject {
     var onNavigateRight: (() -> Void)?
     var onNavigateUp: (() -> Void)?
     var onNavigateDown: (() -> Void)?
-    var onActionA: (() -> Void)? // Launch / Select
+    var onActionA: (() -> Void)? // Launch / Select / Toggle
     var onActionB: (() -> Void)? // Back
     var onActionX: (() -> Void)? // Add Game
+    var onShoulderLeft: (() -> Void)? // L1 / LB (Previous Tab)
+    var onShoulderRight: (() -> Void)? // R1 / RB (Next Tab)
 
     private var cancellables = Set<AnyCancellable>()
     private var lastThumbstickMoveTime: Date = .distantPast
@@ -146,6 +148,28 @@ final class GameControllerManager: ObservableObject {
                 Task { @MainActor in self?.handleActionX() }
             }
         }
+
+        // Shoulder Bumpers & Triggers (Tab switching)
+        gamepad.leftShoulder.pressedChangedHandler = { [weak self] _, _, pressed in
+            if pressed {
+                Task { @MainActor in self?.handleShoulderLeft() }
+            }
+        }
+        gamepad.rightShoulder.pressedChangedHandler = { [weak self] _, _, pressed in
+            if pressed {
+                Task { @MainActor in self?.handleShoulderRight() }
+            }
+        }
+        gamepad.leftTrigger.pressedChangedHandler = { [weak self] _, _, pressed in
+            if pressed {
+                Task { @MainActor in self?.handleShoulderLeft() }
+            }
+        }
+        gamepad.rightTrigger.pressedChangedHandler = { [weak self] _, _, pressed in
+            if pressed {
+                Task { @MainActor in self?.handleShoulderRight() }
+            }
+        }
     }
 
     private func configureMicroGamepad(_ micro: GCMicroGamepad) {
@@ -212,6 +236,16 @@ final class GameControllerManager: ObservableObject {
     private func handleActionX() {
         guard isEnabled else { return }
         onActionX?()
+    }
+
+    private func handleShoulderLeft() {
+        guard isEnabled else { return }
+        onShoulderLeft?()
+    }
+
+    private func handleShoulderRight() {
+        guard isEnabled else { return }
+        onShoulderRight?()
     }
 
     private func cleanControllerName(_ name: String) -> String {

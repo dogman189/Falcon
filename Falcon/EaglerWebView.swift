@@ -39,8 +39,9 @@ struct EaglerWebView: UIViewRepresentable {
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
         webView.isOpaque = true
-        webView.backgroundColor = .black
-        webView.scrollView.backgroundColor = .black
+        let darkBlue = UIColor(red: 11 / 255, green: 20 / 255, blue: 38 / 255, alpha: 1)
+        webView.backgroundColor = darkBlue
+        webView.scrollView.backgroundColor = darkBlue
         webView.scrollView.isScrollEnabled = false
         webView.scrollView.bounces = false
         webView.scrollView.bouncesZoom = false
@@ -68,7 +69,7 @@ struct EaglerWebView: UIViewRepresentable {
         case let .file(fileURL):
             guard FileManager.default.fileExists(atPath: fileURL.path) else {
                 assertionFailure("Missing bundled resource: \(fileURL.lastPathComponent)")
-                let message = "<html><body style='background:#000;color:#fff;font-family:-apple-system'>Missing bundled client: \(fileURL.lastPathComponent)</body></html>"
+                let message = "<html><body style='background:#0B1426;color:#fff;font-family:-apple-system'>Missing bundled client: \(fileURL.lastPathComponent)</body></html>"
                 webView.loadHTMLString(message, baseURL: nil)
                 return
             }

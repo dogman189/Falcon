@@ -7,6 +7,10 @@
 
 import SwiftUI
 
+extension Color {
+    static let appBackground = Color(red: 11 / 255, green: 20 / 255, blue: 38 / 255)
+}
+
 @main
 struct FalconApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
@@ -23,6 +27,11 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         supportedInterfaceOrientationsFor window: UIWindow?
     ) -> UIInterfaceOrientationMask {
-        OrientationLock.shared.portraitOnly ? .portrait : .landscape
+        switch OrientationLock.shared.mode {
+        case .auto:
+            return UIDevice.current.userInterfaceIdiom == .pad ? .all : .allButUpsideDown
+        case .landscapeOnly:
+            return .landscape
+        }
     }
 }

@@ -3,10 +3,18 @@ import SwiftUI
 /// Modern, console-style featured hero card displaying the focused game.
 /// Styled like Apple Arcade / Steam Deck featured banner with a clean vignette,
 /// typography, and an unmistakable "Play Now" action button.
+/// Adapts gracefully between Portrait and Landscape orientations, and supports direct controller focus.
 struct HeroHeaderView: View {
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+
     let client: GameClient
     let coverImage: Image
+    var isFocused: Bool = false
     let onPlay: () -> Void
+
+    private var heroHeight: CGFloat {
+        verticalSizeClass == .compact ? 175 : 220
+    }
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -41,19 +49,19 @@ struct HeroHeaderView: View {
             )
 
             // Content Overlay
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: verticalSizeClass == .compact ? 6 : 10) {
                 // Top Tag
                 HStack(spacing: 6) {
                     Circle()
                         .fill(Color.green)
                         .frame(width: 7, height: 7)
                     Text(client.isCustom ? "CUSTOM CLIENT" : "FEATURED")
-                        .font(.system(size: 10, weight: .heavy))
+                        .font(.system(size: 9, weight: .heavy))
                         .tracking(1.2)
                         .foregroundStyle(.white.opacity(0.9))
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 4)
                 .background(.ultraThinMaterial)
                 .clipShape(Capsule())
                 .overlay(
@@ -64,18 +72,18 @@ struct HeroHeaderView: View {
                 Spacer()
 
                 // Title & Subtitle
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 2) {
                     Text(client.name)
-                        .font(.title2.weight(.bold))
+                        .font(verticalSizeClass == .compact ? .title3.weight(.bold) : .title2.weight(.bold))
                         .foregroundStyle(.white)
                         .lineLimit(1)
                         .shadow(color: .black.opacity(0.8), radius: 4, y: 2)
 
                     if let note = client.note {
                         Text(note)
-                            .font(.caption)
+                            .font(.caption2)
                             .foregroundStyle(.white.opacity(0.8))
-                            .lineLimit(2)
+                            .lineLimit(verticalSizeClass == .compact ? 1 : 2)
                             .shadow(color: .black.opacity(0.7), radius: 2, y: 1)
                     }
                 }
@@ -89,23 +97,37 @@ struct HeroHeaderView: View {
                             .font(.subheadline.weight(.bold))
                     }
                     .foregroundStyle(.black)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 10)
+                    .padding(.horizontal, isFocused ? 22 : 18)
+                    .padding(.vertical, verticalSizeClass == .compact ? (isFocused ? 9 : 7) : (isFocused ? 11 : 9))
                     .background(Color.white)
                     .clipShape(Capsule())
-                    .shadow(color: .black.opacity(0.4), radius: 6, y: 3)
+                    .shadow(
+                        color: isFocused ? Color.white.opacity(0.9) : Color.black.opacity(0.4),
+                        radius: isFocused ? 10 : 6,
+                        y: 3
+                    )
+                    .scaleEffect(isFocused ? 1.05 : 1.0)
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .padding(.top, 2)
             }
-            .padding(18)
+            .padding(verticalSizeClass == .compact ? 14 : 18)
         }
-        .frame(height: 220)
+        .frame(height: heroHeight)
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
+                .strokeBorder(
+                    isFocused ? Color.white : Color.white.opacity(0.12),
+                    lineWidth: isFocused ? 3 : 1
+                )
         )
-        .shadow(color: .black.opacity(0.6), radius: 12, y: 6)
+        .scaleEffect(isFocused ? 1.02 : 1.0)
+        .shadow(
+            color: isFocused ? Color.white.opacity(0.35) : Color.black.opacity(0.6),
+            radius: isFocused ? 16 : 12,
+            y: 6
+        )
+        .animation(.spring(response: 0.25, dampingFraction: 0.75), value: isFocused)
     }
 }

@@ -82,15 +82,17 @@ struct GameCard: View {
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .strokeBorder(
-                        isFocused ? Color.white.opacity(0.8) : Color.white.opacity(0.12),
-                        lineWidth: isFocused ? 2 : 1
+                        isFocused ? Color.white : Color.white.opacity(0.12),
+                        lineWidth: isFocused ? 3 : 1
                     )
             )
+            .scaleEffect(isFocused ? 1.05 : 1.0)
             .shadow(
-                color: isFocused ? Color.white.opacity(0.2) : Color.black.opacity(0.4),
-                radius: isFocused ? 10 : 5,
-                y: 3
+                color: isFocused ? Color.white.opacity(0.35) : Color.black.opacity(0.4),
+                radius: isFocused ? 12 : 5,
+                y: isFocused ? 5 : 3
             )
+            .animation(.spring(response: 0.25, dampingFraction: 0.75), value: isFocused)
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -98,6 +100,7 @@ struct GameCard: View {
 
 /// Dashed placeholder card to import custom clients.
 struct AddClientCard: View {
+    var isFocused: Bool = false
     let action: () -> Void
 
     private let cardWidth: CGFloat = 200
@@ -108,26 +111,33 @@ struct AddClientCard: View {
             VStack(spacing: 8) {
                 Image(systemName: "plus.circle.fill")
                     .font(.title2)
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(isFocused ? .white : .white.opacity(0.5))
 
                 Text("Import Client")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(isFocused ? .white : .white.opacity(0.7))
 
                 Text(".html / .htm")
                     .font(.system(size: 10))
-                    .foregroundStyle(.white.opacity(0.35))
+                    .foregroundStyle(.white.opacity(isFocused ? 0.7 : 0.35))
             }
             .frame(width: cardWidth, height: cardHeight)
-            .background(Color.white.opacity(0.04))
+            .background(isFocused ? Color.white.opacity(0.12) : Color.white.opacity(0.04))
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .strokeBorder(
-                        Color.white.opacity(0.2),
-                        style: StrokeStyle(lineWidth: 1.5, dash: [6, 4])
+                        isFocused ? Color.white : Color.white.opacity(0.2),
+                        style: isFocused ? StrokeStyle(lineWidth: 3) : StrokeStyle(lineWidth: 1.5, dash: [6, 4])
                     )
             )
+            .scaleEffect(isFocused ? 1.05 : 1.0)
+            .shadow(
+                color: isFocused ? Color.white.opacity(0.3) : Color.clear,
+                radius: 10,
+                y: 4
+            )
+            .animation(.spring(response: 0.25, dampingFraction: 0.75), value: isFocused)
         }
         .buttonStyle(ScaleButtonStyle())
     }

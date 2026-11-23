@@ -1,18 +1,24 @@
-//
-//  OrientationLock.swift
-//  Falcon
-//
-//  Created by Aanetra Vaidya on 11/19/26.
-//
-
 import Combine
 import UIKit
 
 final class OrientationLock: ObservableObject {
     static let shared = OrientationLock()
 
-    @Published var portraitOnly = true {
+    enum Mode {
+        /// Allows both portrait and landscape orientation (for library, settings, and packer).
+        case auto
+        /// Locks strictly to landscape for immersive gameplay.
+        case landscapeOnly
+    }
+
+    @Published var mode: Mode = .auto {
         didSet { apply() }
+    }
+
+    /// Backwards compatibility bridge
+    var portraitOnly: Bool {
+        get { mode != .landscapeOnly }
+        set { mode = newValue ? .auto : .landscapeOnly }
     }
 
     func apply() {
@@ -22,10 +28,13 @@ final class OrientationLock: ObservableObject {
             ?? windowScenes.first
         guard let scene else { return }
 
-        // The deployment target is iOS 27.2, so these iOS 16+ APIs are always available.
-        scene.requestGeometryUpdate(
-            .iOS(interfaceOrientations: portraitOnly ? .portrait : .landscape)
-        )
+        switch mode {
+        case .auto:
+            let mask: UIInterfaceOrientationMask = UIDevice.current.userInterfaceIdiom == .pad ? .all : .allButUpsideDown
+            scene.requestGeometryUpdate(.iOS(interfaceOrientations: mask))
+        case .landscapeOnly:
+            scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscape))
+        }
         scene.keyWindow?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
     }
 }

@@ -58,7 +58,7 @@ struct ContentView: View {
                     }
                     .id(webViewIdentity)
                     .ignoresSafeArea()
-                    .background(.black)
+                    .background(Color.appBackground)
                     .overlay(alignment: .topLeading) {
                         ZStack(alignment: .topLeading) {
                             Color.clear
@@ -92,9 +92,15 @@ struct ContentView: View {
 
                     RetroPackerView(
                         model: retroPackerModel,
+                        isActiveTab: selectedTab == .packer,
                         onImported: { _ in
                             loadClients()
                             selectedTab = .library
+                        },
+                        onReturnToLibrary: {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                selectedTab = .library
+                            }
                         },
                         onCancel: nil
                     )
@@ -104,7 +110,7 @@ struct ContentView: View {
                     }
                 }
                 .tint(.white)
-                .toolbarBackground(.black, for: .tabBar)
+                .toolbarBackground(Color.appBackground, for: .tabBar)
                 .toolbarBackground(.visible, for: .tabBar)
             }
         }
@@ -115,12 +121,13 @@ struct ContentView: View {
                 reVCDOSServer?.stop()
                 reVCDOSServer = nil
             }
-            OrientationLock.shared.portraitOnly = (selectedClient == nil)
+            OrientationLock.shared.mode = (selectedClient == nil) ? .auto : .landscapeOnly
             GameControllerManager.shared.isEnabled = (newClient == nil)
         }
         .task {
             loadClients()
             openDebugClientIfRequested()
+            setupControllerTabSwitching()
         }
         .fileImporter(
             isPresented: $showingFileImporter,
@@ -277,7 +284,7 @@ struct ContentView: View {
         }
         .padding(32)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.black)
+        .background(Color.appBackground)
         .foregroundStyle(.white)
         .ignoresSafeArea()
     }
@@ -291,6 +298,11 @@ struct ContentView: View {
             onSelect: { selectClient($0) },
             onAddClient: { showingFileImporter = true },
             onRemoveClient: { removeCustomClient($0) },
+            onOpenPacker: {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    selectedTab = .packer
+                }
+            },
             coverMenuItems: { client in
                 AnyView(coverMenuItems(for: client))
             },
@@ -298,6 +310,19 @@ struct ContentView: View {
                 AnyView(reVCDOSContextItems(for: client))
             }
         )
+    }
+
+    private func setupControllerTabSwitching() {
+        GameControllerManager.shared.onShoulderLeft = {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                selectedTab = .library
+            }
+        }
+        GameControllerManager.shared.onShoulderRight = {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                selectedTab = .packer
+            }
+        }
     }
 
     @ViewBuilder

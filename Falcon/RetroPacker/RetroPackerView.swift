@@ -150,51 +150,91 @@ final class RetroPackerModel {
 
 /// Native SwiftUI screen for turning a user-owned ROM into a portable HTML game
 /// client using the hidden `RetroPackerEngine`.
+/// Fully supports gamepad/controller navigation, field toggling, and system selection.
 struct RetroPackerView: View {
     @Bindable var model: RetroPackerModel
+    var isActiveTab: Bool = true
     let onImported: (GameClient) -> Void
+    var onReturnToLibrary: (() -> Void)? = nil
     let onCancel: (() -> Void)?
+
+    @ObservedObject private var controllerManager = GameControllerManager.shared
+    /// 0: ROM File, 1: System Picker, 2: Game Title TextField, 3: Pack / Cancel Button
+    @State private var focusedField: Int = 0
+    @FocusState private var isTitleFieldFocused: Bool
 
     var body: some View {
         NavigationStack {
             Form {
-                // ROM file section
+                // ROM file section (Field 0)
                 Section {
                     Button {
+                        focusedField = 0
                         model.showingFileImporter = true
                     } label: {
                         HStack {
                             Image(systemName: "doc.badge.plus")
+                                .font(.body.weight(focusedField == 0 ? .bold : .regular))
                             if model.romFileName.isEmpty {
                                 Text("Choose ROM File")
+                                    .fontWeight(focusedField == 0 ? .semibold : .regular)
                             } else {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(model.romFileName)
                                         .foregroundStyle(.primary)
+                                        .fontWeight(focusedField == 0 ? .semibold : .regular)
                                     Text(byteCountLabel(model.romByteCount))
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }
                             }
+                            Spacer()
+                            if focusedField == 0 && controllerManager.isConnected {
+                                Image(systemName: "button.programmable")
+                                    .foregroundStyle(.white.opacity(0.7))
+                            }
                         }
                     }
                     .disabled(model.isPacking)
+                    .listRowBackground(rowBackground(for: 0))
                 } header: {
-                    Text("ROM File")
+                    HStack {
+                        Text("ROM File")
+                        if focusedField == 0 && controllerManager.isConnected {
+                            Text("• SELECTED").font(.caption2.bold()).foregroundStyle(.green)
+                        }
+                    }
                 } footer: {
                     Text("Select a ROM file you own. Nothing is uploaded; packing happens on your device.")
                 }
 
-                // System section
+                // System section (Field 1)
                 Section {
-                    Picker("System", selection: $model.selectedSystem) {
-                        Text(model.romFileName.isEmpty ? "Choose a ROM first" : "Select a system")
-                            .tag(nil as RetroSystem?)
-                        ForEach(RetroSystemCatalog.systems) { system in
-                            Text(system.label).tag(system as RetroSystem?)
+                    HStack {
+                        Picker("System", selection: $model.selectedSystem) {
+                            Text(model.romFileName.isEmpty ? "Choose a ROM first" : "Select a system")
+                                .tag(nil as RetroSystem?)
+                            ForEach(RetroSystemCatalog.systems) { system in
+                                Text(system.label).tag(system as RetroSystem?)
+                            }
+                        }
+                        .disabled(model.isPacking)
+
+                        if focusedField == 1 && controllerManager.isConnected {
+                            HStack(spacing: 3) {
+                                Image(systemName: "chevron.left")
+                                Text("D-Pad")
+                                Image(systemName: "chevron.right")
+                            }
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.white.opacity(0.8))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(Color.white.opacity(0.15))
+                            .clipShape(Capsule())
                         }
                     }
-                    .disabled(model.isPacking)
+                    .listRowBackground(rowBackground(for: 1))
 
                     if let note = model.systemDetectionNote {
                         Text(note)
@@ -202,20 +242,32 @@ struct RetroPackerView: View {
                             .foregroundStyle(.secondary)
                     }
                 } header: {
-                    Text("System")
+                    HStack {
+                        Text("System")
+                        if focusedField == 1 && controllerManager.isConnected {
+                            Text("• SELECTED").font(.caption2.bold()).foregroundStyle(.green)
+                        }
+                    }
                 }
 
-                // Details section
+                // Details section (Field 2)
                 Section {
                     TextField("Game title", text: $model.title)
+                        .focused($isTitleFieldFocused)
                         .disabled(model.isPacking)
+                        .listRowBackground(rowBackground(for: 2))
                 } header: {
-                    Text("Details")
+                    HStack {
+                        Text("Details")
+                        if focusedField == 2 && controllerManager.isConnected {
+                            Text("• SELECTED").font(.caption2.bold()).foregroundStyle(.green)
+                        }
+                    }
                 } footer: {
                     Text("This name is used for the imported client in your library.")
                 }
 
-                // Pack section
+                // Pack section (Field 3)
                 Section {
                     if model.isPacking {
                         VStack(alignment: .leading, spacing: 8) {
@@ -230,18 +282,21 @@ struct RetroPackerView: View {
                         Button("Cancel Packing", role: .cancel) {
                             model.cancelPacking()
                         }
+                        .listRowBackground(rowBackground(for: 3))
                     } else {
                         Button {
+                            focusedField = 3
                             model.startPacking()
                         } label: {
                             HStack {
                                 Spacer()
                                 Label("Pack and Add to Library", systemImage: "shippingbox.and.arrow.backward")
-                                    .fontWeight(.semibold)
+                                    .fontWeight(.bold)
                                 Spacer()
                             }
                         }
                         .disabled(!canPack)
+                        .listRowBackground(rowBackground(for: 3, isPrimaryButton: true))
                     }
 
                     if let error = model.errorMessage, !model.isPacking {
@@ -254,11 +309,55 @@ struct RetroPackerView: View {
                         Text("The emulator core is downloaded on demand during packing. You need an internet connection the first time you pack a system.")
                     }
                 }
+
+                // Controller Legend (when connected)
+                if controllerManager.isConnected {
+                    Section {
+                        VStack(spacing: 8) {
+                            HStack(spacing: 14) {
+                                buttonLegendItem(button: "A", label: actionLabel)
+                                buttonLegendItem(button: "B", label: "Library")
+                                buttonLegendItem(button: "LB", label: "Library Tab")
+                            }
+                            if focusedField == 1 {
+                                HStack(spacing: 6) {
+                                    buttonLegendItem(button: "◀ ▶", label: "Change System")
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 4)
+                        .listRowBackground(Color.clear)
+                    }
+                }
             }
+            .scrollContentBackground(.hidden)
+            .background(Color.appBackground)
             .navigationTitle("Pack a Game")
+            .toolbarBackground(Color.appBackground, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    if controllerManager.isConnected {
+                        HStack(spacing: 5) {
+                            Circle()
+                                .fill(Color.green)
+                                .frame(width: 7, height: 7)
+                            Image(systemName: "gamecontroller.fill")
+                                .font(.caption2)
+                            Text(controllerManager.controllerName)
+                                .font(.caption.weight(.semibold))
+                        }
+                        .foregroundStyle(.white.opacity(0.8))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.white.opacity(0.1))
+                        .clipShape(Capsule())
+                    }
+                }
+
                 if let onCancel {
-                    ToolbarItem(placement: .topBarLeading) {
+                    ToolbarItem(placement: .topBarTrailing) {
                         Button("Cancel") {
                             if model.isPacking {
                                 model.cancelPacking()
@@ -283,6 +382,14 @@ struct RetroPackerView: View {
             .onAppear {
                 model.onImported = onImported
                 model.loadIfNeeded()
+                if isActiveTab {
+                    setupControllerCallbacks()
+                }
+            }
+            .onChange(of: isActiveTab) { _, active in
+                if active {
+                    setupControllerCallbacks()
+                }
             }
             .overlay(alignment: .bottomTrailing) {
                 // Host the engine's WKWebView invisibly so iOS does not throttle it.
@@ -300,6 +407,129 @@ struct RetroPackerView: View {
             && model.selectedSystem != nil
             && !model.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && !model.isPacking
+    }
+
+    private var actionLabel: String {
+        switch focusedField {
+        case 0: return "Choose ROM"
+        case 1: return "Next System"
+        case 2: return "Edit Title"
+        case 3: return model.isPacking ? "Cancel" : "Pack Game"
+        default: return "Select"
+        }
+    }
+
+    @ViewBuilder
+    private func rowBackground(for fieldIndex: Int, isPrimaryButton: Bool = false) -> some View {
+        let isFocused = (focusedField == fieldIndex && controllerManager.isConnected)
+        ZStack {
+            if isPrimaryButton {
+                isFocused ? Color.white.opacity(0.25) : Color.white.opacity(0.1)
+            } else {
+                isFocused ? Color.white.opacity(0.12) : Color.white.opacity(0.06)
+            }
+
+            if isFocused {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(Color.white, lineWidth: 2)
+            }
+        }
+    }
+
+    private func buttonLegendItem(button: String, label: String) -> some View {
+        HStack(spacing: 4) {
+            Text(button)
+                .font(.system(size: 11, weight: .heavy, design: .rounded))
+                .padding(.horizontal, 5)
+                .padding(.vertical, 2)
+                .background(Color.white.opacity(0.2))
+                .clipShape(Capsule())
+            Text(label)
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.white.opacity(0.75))
+        }
+    }
+
+    // MARK: - Controller Navigation
+
+    private func setupControllerCallbacks() {
+        controllerManager.onNavigateUp = {
+            navigateVertically(step: -1)
+        }
+
+        controllerManager.onNavigateDown = {
+            navigateVertically(step: 1)
+        }
+
+        controllerManager.onNavigateLeft = {
+            navigateHorizontally(step: -1)
+        }
+
+        controllerManager.onNavigateRight = {
+            navigateHorizontally(step: 1)
+        }
+
+        controllerManager.onActionA = {
+            handleActionA()
+        }
+
+        controllerManager.onActionB = {
+            handleActionB()
+        }
+    }
+
+    private func navigateVertically(step: Int) {
+        let newField = max(0, min(3, focusedField + step))
+        if newField != focusedField {
+            focusedField = newField
+            isTitleFieldFocused = (newField == 2)
+        }
+    }
+
+    private func navigateHorizontally(step: Int) {
+        if focusedField == 1 {
+            // Cycle system in catalog
+            cycleSystem(step: step)
+        }
+    }
+
+    private func cycleSystem(step: Int) {
+        let all = RetroSystemCatalog.systems
+        guard !all.isEmpty else { return }
+
+        if let current = model.selectedSystem, let idx = all.firstIndex(of: current) {
+            let nextIdx = (idx + step + all.count) % all.count
+            model.selectedSystem = all[nextIdx]
+        } else {
+            model.selectedSystem = all.first
+        }
+    }
+
+    private func handleActionA() {
+        switch focusedField {
+        case 0:
+            model.showingFileImporter = true
+        case 1:
+            cycleSystem(step: 1)
+        case 2:
+            isTitleFieldFocused = true
+        case 3:
+            if model.isPacking {
+                model.cancelPacking()
+            } else if canPack {
+                model.startPacking()
+            }
+        default:
+            break
+        }
+    }
+
+    private func handleActionB() {
+        if model.isPacking {
+            model.cancelPacking()
+        } else {
+            onReturnToLibrary?()
+        }
     }
 
     private func byteCountLabel(_ count: Int) -> String {
