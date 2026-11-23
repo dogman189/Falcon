@@ -83,30 +83,34 @@ final class RetroPackerEngine: NSObject, WKScriptMessageHandler {
         let perform: () -> Void = { [weak self] in
             guard let self else { return }
             guard let webView = self._webView else { return }
-            do {
-                let encoder = JSONEncoder()
-                let data = try encoder.encode(request)
-                guard let jsonString = String(data: data, encoding: .utf8) else {
-                    throw NSError(domain: "RetroPackerEngine", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unable to encode packing request."])
-                }
-                let script = "window.FalconRetroPacker.pack(\(jsonString));"
-                webView.evaluateJavaScript(script) { [weak self] _, error in
-                    Task { @MainActor in
-                        guard let self else { return }
-                        if let error, self.currentRequestID == id {
-                            self.timeoutTask?.cancel()
-                            self.timeoutTask = nil
-                            self.currentRequestID = nil
-                            self.onError?(error.localizedDescription)
-                        }
+            // Pass the request as a structured argument instead of embedding the
+            // (potentially multi-MB) ROM base64 payload in the evaluated script
+            // string. WKWebView serializes the arguments as JSON over IPC, which
+            // avoids the known `evaluateJavaScript` string-size risk for large ROMs.
+            let arguments: [String: Any] = [
+                "request": [
+                    "id": request.id,
+                    "romBase64": request.romBase64,
+                    "romName": request.romName,
+                    "system": request.system,
+                    "title": request.title,
+                    "color": request.color
+                ]
+            ]
+            webView.callAsyncJavaScript(
+                "window.FalconRetroPacker.pack(request);",
+                arguments: arguments,
+                in: nil,
+                in: .page
+            ) { [weak self] result in
+                Task { @MainActor in
+                    guard let self else { return }
+                    if case .failure(let error) = result, self.currentRequestID == id {
+                        self.timeoutTask?.cancel()
+                        self.timeoutTask = nil
+                        self.currentRequestID = nil
+                        self.onError?(error.localizedDescription)
                     }
-                }
-            } catch {
-                if self.currentRequestID == id {
-                    self.timeoutTask?.cancel()
-                    self.timeoutTask = nil
-                    self.currentRequestID = nil
-                    self.onError?(error.localizedDescription)
                 }
             }
         }

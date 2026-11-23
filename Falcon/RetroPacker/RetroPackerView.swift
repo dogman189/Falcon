@@ -158,6 +158,12 @@ struct RetroPackerView: View {
                 if isPacking {
                     engine.cancel()
                 }
+                // Reset packing UI state so a reopened sheet never shows a stuck
+                // "Packing…" button after a swipe-dismiss mid-pack.
+                isPacking = false
+                progress = 0
+                statusMessage = ""
+                errorMessage = nil
             }
             .overlay(alignment: .bottomTrailing) {
                 // Host the engine's WKWebView invisibly so iOS does not throttle it.
