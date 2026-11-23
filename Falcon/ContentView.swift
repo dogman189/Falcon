@@ -21,6 +21,7 @@ struct ContentView: View {
     @State private var clientFailure: String?
     @State private var customClients: [GameClient] = []
     @State private var selectedTab: AppTab = .library
+    @State private var retroPackerModel = RetroPackerModel()
     @State private var showingFileImporter = false
     @State private var importErrorMessage: String?
     @State private var showingImportError = false
@@ -90,6 +91,7 @@ struct ContentView: View {
                         }
 
                     RetroPackerView(
+                        model: retroPackerModel,
                         onImported: { _ in
                             loadClients()
                             selectedTab = .library

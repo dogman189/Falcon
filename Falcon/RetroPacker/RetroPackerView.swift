@@ -1,194 +1,49 @@
+import Observation
 import SwiftUI
 import UniformTypeIdentifiers
 import WebKit
 
-/// Native SwiftUI screen for turning a user-owned ROM into a portable HTML game
-/// client using the hidden `RetroPackerEngine`.
-struct RetroPackerView: View {
-    let onImported: (GameClient) -> Void
-    let onCancel: (() -> Void)?
+@Observable
+@MainActor
+final class RetroPackerModel {
+    let engine = RetroPackerEngine()
 
-    @State private var engine = RetroPackerEngine()
+    var showingFileImporter = false
+    var romData: Data?
+    var romFileName: String = ""
+    var romByteCount: Int = 0
 
-    // ROM selection
-    @State private var showingFileImporter = false
-    @State private var romData: Data?
-    @State private var romFileName: String = ""
-    @State private var romByteCount: Int = 0
+    var selectedSystem: RetroSystem?
+    var systemDetectionNote: String?
+    var title: String = ""
 
-    // Detection / details
-    @State private var selectedSystem: RetroSystem?
-    @State private var systemDetectionNote: String?
-    @State private var title: String = ""
+    var isPacking = false
+    var progress: Double = 0
+    var statusMessage: String = ""
+    var errorMessage: String?
 
-    // Packing state
-    @State private var isPacking = false
-    @State private var progress: Double = 0
-    @State private var statusMessage: String = ""
-    @State private var errorMessage: String?
+    var showingImportError = false
+    var importErrorMessage: String?
 
-    // File import errors
-    @State private var showingImportError = false
-    @State private var importErrorMessage: String?
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    Button {
-                        showingFileImporter = true
-                    } label: {
-                        HStack {
-                            Label("Choose ROM", systemImage: "doc")
-                            Spacer()
-                            if !romFileName.isEmpty {
-                                Text(romFileName)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                                    .truncationMode(.middle)
-                            }
-                        }
-                    }
-                    .buttonStyle(.plain)
-
-                    if !romFileName.isEmpty {
-                        LabeledContent("Size", value: ByteCountFormatter.string(fromByteCount: Int64(romByteCount), countStyle: .file))
-                    }
-
-                    Text("Import a ROM you own.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                } header: {
-                    Text("ROM")
-                }
-
-                Section {
-                    Picker("System", selection: $selectedSystem) {
-                        Text("Select a system").tag(nil as RetroSystem?)
-                        ForEach(RetroSystemCatalog.systems) { system in
-                            Text(system.label).tag(system as RetroSystem?)
-                        }
-                    }
-
-                    if let systemDetectionNote {
-                        Text(systemDetectionNote)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    TextField("Title", text: $title)
-                } header: {
-                    Text("Details")
-                }
-
-                Section {
-                    Button {
-                        startPacking()
-                    } label: {
-                        if isPacking {
-                            HStack {
-                                ProgressView()
-                                Text("Packing…")
-                            }
-                        } else {
-                            Text("Pack Game")
-                        }
-                    }
-                    .disabled(romData == nil || selectedSystem == nil || title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isPacking)
-
-                    if isPacking {
-                        ProgressView(value: max(0, min(progress, 1)))
-                            .progressViewStyle(.linear)
-
-                        if !statusMessage.isEmpty {
-                            Text(statusMessage)
-                                .font(.footnote.monospacedDigit())
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Button("Cancel Packing", role: .cancel) {
-                            cancelPacking()
-                        }
-                    }
-
-                    if let errorMessage {
-                        Text(errorMessage)
-                            .font(.footnote)
-                            .foregroundStyle(.red)
-                    }
-                } header: {
-                    Text("Pack")
-                }
-            }
-            .listStyle(.insetGrouped)
-            .navigationTitle("Pack a Game")
-            .toolbar {
-                if let onCancel {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button("Cancel") {
-                            if isPacking {
-                                cancelPacking()
-                            }
-                            onCancel()
-                        }
-                    }
-                }
-            }
-            .fileImporter(
-                isPresented: $showingFileImporter,
-                allowedContentTypes: Self.allowedROMTypes,
-                allowsMultipleSelection: false
-            ) { result in
-                handleFileSelection(result)
-            }
-            .alert("Couldn't Open ROM", isPresented: $showingImportError) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(importErrorMessage ?? "Unknown error.")
-            }
-            .onAppear {
-                engine.loadIfNeeded()
-                wireCallbacks()
-            }
-            .onDisappear {
-                // Break the engine -> callback -> view retain cycle and stop any
-                // in-flight pack when the screen goes away (cancel button, swipe
-                // dismiss, or parent removal).
-                engine.onProgress = nil
-                engine.onComplete = nil
-                engine.onError = nil
-                if isPacking {
-                    engine.cancel()
-                }
-                // Reset packing UI state so a reopened sheet never shows a stuck
-                // "Packing…" button after a swipe-dismiss mid-pack.
-                isPacking = false
-                progress = 0
-                statusMessage = ""
-                errorMessage = nil
-            }
-            .overlay(alignment: .bottomTrailing) {
-                // Host the engine's WKWebView invisibly so iOS does not throttle it.
-                RetroPackerEngineHost(engine: engine)
-                    .frame(width: 1, height: 1)
-                    .opacity(0.01)
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
-            }
-        }
+    init() {
+        wireCallbacks()
     }
 
-    // MARK: - Callbacks
+    func loadIfNeeded() {
+        engine.loadIfNeeded()
+    }
 
-    private func wireCallbacks() {
-        engine.onProgress = { percent, message in
+    func wireCallbacks() {
+        engine.onProgress = { [weak self] percent, message in
             Task { @MainActor in
+                guard let self else { return }
                 self.progress = percent
                 self.statusMessage = message
             }
         }
-        engine.onComplete = { fileName, htmlData in
+        engine.onComplete = { [weak self] fileName, htmlData in
             Task { @MainActor in
+                guard let self else { return }
                 let name = self.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? fileName : self.title
                 do {
                     let client = try CustomClientStore.shared.importGeneratedClient(named: name, htmlData: htmlData)
@@ -196,7 +51,7 @@ struct RetroPackerView: View {
                     self.progress = 0
                     self.statusMessage = ""
                     self.errorMessage = nil
-                    self.onImported(client)
+                    self.onImported?(client)
                 } catch {
                     self.errorMessage = error.localizedDescription
                     self.isPacking = false
@@ -205,8 +60,9 @@ struct RetroPackerView: View {
                 }
             }
         }
-        engine.onError = { message in
+        engine.onError = { [weak self] message in
             Task { @MainActor in
+                guard let self else { return }
                 self.errorMessage = message
                 self.isPacking = false
                 self.progress = 0
@@ -215,9 +71,9 @@ struct RetroPackerView: View {
         }
     }
 
-    // MARK: - Actions
+    var onImported: ((GameClient) -> Void)?
 
-    private func handleFileSelection(_ result: Result<[URL], Error>) {
+    func handleFileSelection(_ result: Result<[URL], Error>) {
         switch result {
         case .success(let urls):
             guard let url = urls.first else { return }
@@ -258,7 +114,7 @@ struct RetroPackerView: View {
         }
     }
 
-    private func startPacking() {
+    func startPacking() {
         guard let romData, let system = selectedSystem else { return }
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedTitle.isEmpty else { return }
@@ -271,16 +127,14 @@ struct RetroPackerView: View {
         engine.pack(romData: romData, romName: romFileName, system: system.id, title: trimmedTitle)
     }
 
-    private func cancelPacking() {
+    func cancelPacking() {
         engine.cancel()
         isPacking = false
         progress = 0
         statusMessage = ""
     }
 
-    // MARK: - Helpers
-
-    private static var allowedROMTypes: [UTType] {
+    static var allowedROMTypes: [UTType] {
         var types: Set<UTType> = [.data]
         for system in RetroSystemCatalog.systems {
             for ext in system.extensions {
@@ -291,6 +145,168 @@ struct RetroPackerView: View {
             }
         }
         return Array(types)
+    }
+}
+
+/// Native SwiftUI screen for turning a user-owned ROM into a portable HTML game
+/// client using the hidden `RetroPackerEngine`.
+struct RetroPackerView: View {
+    @Bindable var model: RetroPackerModel
+    let onImported: (GameClient) -> Void
+    let onCancel: (() -> Void)?
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                // ROM file section
+                Section {
+                    Button {
+                        model.showingFileImporter = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "doc.badge.plus")
+                            if model.romFileName.isEmpty {
+                                Text("Choose ROM File")
+                            } else {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(model.romFileName)
+                                        .foregroundStyle(.primary)
+                                    Text(byteCountLabel(model.romByteCount))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                    .disabled(model.isPacking)
+                } header: {
+                    Text("ROM File")
+                } footer: {
+                    Text("Select a ROM file you own. Nothing is uploaded; packing happens on your device.")
+                }
+
+                // System section
+                Section {
+                    Picker("System", selection: $model.selectedSystem) {
+                        Text(model.romFileName.isEmpty ? "Choose a ROM first" : "Select a system")
+                            .tag(nil as RetroSystem?)
+                        ForEach(RetroSystemCatalog.systems) { system in
+                            Text(system.label).tag(system as RetroSystem?)
+                        }
+                    }
+                    .disabled(model.isPacking)
+
+                    if let note = model.systemDetectionNote {
+                        Text(note)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("System")
+                }
+
+                // Details section
+                Section {
+                    TextField("Game title", text: $model.title)
+                        .disabled(model.isPacking)
+                } header: {
+                    Text("Details")
+                } footer: {
+                    Text("This name is used for the imported client in your library.")
+                }
+
+                // Pack section
+                Section {
+                    if model.isPacking {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ProgressView(value: model.progress)
+                                .progressViewStyle(.linear)
+                            Text(model.statusMessage.isEmpty ? "Packing…" : model.statusMessage)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 4)
+
+                        Button("Cancel Packing", role: .cancel) {
+                            model.cancelPacking()
+                        }
+                    } else {
+                        Button {
+                            model.startPacking()
+                        } label: {
+                            HStack {
+                                Spacer()
+                                Label("Pack and Add to Library", systemImage: "shippingbox.and.arrow.backward")
+                                    .fontWeight(.semibold)
+                                Spacer()
+                            }
+                        }
+                        .disabled(!canPack)
+                    }
+
+                    if let error = model.errorMessage, !model.isPacking {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+                } footer: {
+                    if !model.isPacking {
+                        Text("The emulator core is downloaded on demand during packing. You need an internet connection the first time you pack a system.")
+                    }
+                }
+            }
+            .navigationTitle("Pack a Game")
+            .toolbar {
+                if let onCancel {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Cancel") {
+                            if model.isPacking {
+                                model.cancelPacking()
+                            }
+                            onCancel()
+                        }
+                    }
+                }
+            }
+            .fileImporter(
+                isPresented: $model.showingFileImporter,
+                allowedContentTypes: RetroPackerModel.allowedROMTypes,
+                allowsMultipleSelection: false
+            ) { result in
+                model.handleFileSelection(result)
+            }
+            .alert("Couldn't Open ROM", isPresented: $model.showingImportError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(model.importErrorMessage ?? "Unknown error.")
+            }
+            .onAppear {
+                model.onImported = onImported
+                model.loadIfNeeded()
+            }
+            .overlay(alignment: .bottomTrailing) {
+                // Host the engine's WKWebView invisibly so iOS does not throttle it.
+                RetroPackerEngineHost(engine: model.engine)
+                    .frame(width: 1, height: 1)
+                    .opacity(0.01)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+        }
+    }
+
+    private var canPack: Bool {
+        model.romData != nil
+            && model.selectedSystem != nil
+            && !model.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !model.isPacking
+    }
+
+    private func byteCountLabel(_ count: Int) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useKB, .useMB, .useGB]
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: Int64(count))
     }
 }
 
