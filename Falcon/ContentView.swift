@@ -374,10 +374,7 @@ struct ContentView: View {
                 clientFailure = preflight.errorMessage
                 return
             }
-            let server = ReVCDOSLocalServer(
-                rootURL: rootURL,
-                fallbackRootURL: ReVCDOSAssetManifest.bundleRootURL()
-            )
+            let server = ReVCDOSLocalServer(rootURL: rootURL)
             do {
                 try server.start()
             } catch {
@@ -410,10 +407,9 @@ struct ContentView: View {
                 downloadProgress = max(0, min(value, 1))
                 if value < 1 {
                     downloadStatus = "Downloading… \(Int((max(0, min(value, 1)) * 100).rounded()))%"
+                } else {
+                    downloadStatus = "Installing…"
                 }
-            },
-            status: { value in
-                downloadStatus = value
             },
             completion: { result in
                 assetDownloadInFlight = false
