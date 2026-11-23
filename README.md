@@ -8,6 +8,7 @@ Falcon is a native iOS (SwiftUI) launcher/wrapper for bundled Eaglercraft-style 
   - `1.8.8-wasm`
   - `reVCDOS` — HTML5 port of GTA: Vice City; game data is downloaded once, then played offline
 - **Custom clients**: import a single `.html` client file from Files and launch it from the selector
+- **Pack Retro Game**: turn a user-owned ROM into a portable HTML game client (universal systems only; ROM supplied by user; emulator cores downloaded on demand; generated HTML imported as a custom client)
 - **Immersive web view**: browser-chrome-free `WKWebView` surface tuned for gameplay
 - **Client covers**:
   - default per-client cover art
@@ -34,6 +35,17 @@ The app ships without the game data. On first launch, reVCDOS shows a download s
 - You can also start it from the reVCDOS tile's context menu: **Download full assets…**.
 
 Once downloaded, the game runs fully offline through the local server on `localhost:8199`.
+
+## Pack Retro Game
+
+Falcon can pack a user-owned ROM into a portable HTML game client:
+
+- **Universal systems only** (no platform-specific cores are bundled).
+- The **user supplies the ROM**; Falcon does not ship or download any game data.
+- Emulator cores are **downloaded on demand** by the generated client.
+- The result is **generated HTML imported as a custom client**, launchable from the selector like any other custom client.
+
+> Legal note: only use ROMs you own the rights to. Falcon does not provide or distribute ROMs or copyrighted game data.
 
 ## Project structure
 
