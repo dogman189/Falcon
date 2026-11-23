@@ -35,6 +35,15 @@ func runTests() {
     } catch {
         fatalError("pack request Codable test failed: \(error)")
     }
+    do {
+        try testImportGeneratedClientWritesFileAndRecord()
+        try testImportGeneratedClientKeepsDuplicateNamesDistinct()
+        try testImportGeneratedClientSanitizesNameForFileName()
+        try testImportGeneratedClientAvoidsDoubleHtmlExtension()
+        try testFileImportStillWorksWithInjectedDirectory()
+    } catch {
+        fatalError("custom client store test failed: \(error)")
+    }
     print("ALL TESTS PASSED")
 }
 
