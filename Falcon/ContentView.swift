@@ -84,7 +84,7 @@ struct ContentView: View {
                 }
             } else {
                 TabView(selection: $selectedTab) {
-                    clientSelector
+                    libraryTab
                         .tag(AppTab.library)
                         .tabItem {
                             Label("Library", systemImage: "gamecontroller")
@@ -103,15 +103,20 @@ struct ContentView: View {
                         Label("Packer", systemImage: "shippingbox")
                     }
                 }
+                .tint(.white)
+                .toolbarBackground(.black, for: .tabBar)
+                .toolbarBackground(.visible, for: .tabBar)
             }
         }
-        .onChange(of: selectedClient) { _, _ in
+        .preferredColorScheme(.dark)
+        .onChange(of: selectedClient) { _, newClient in
             hideQuit()
             if selectedClient == nil {
                 reVCDOSServer?.stop()
                 reVCDOSServer = nil
             }
             OrientationLock.shared.portraitOnly = (selectedClient == nil)
+            GameControllerManager.shared.isEnabled = (newClient == nil)
         }
         .task {
             loadClients()
@@ -277,83 +282,41 @@ struct ContentView: View {
         .ignoresSafeArea()
     }
 
-    private var clientSelector: some View {
-        NavigationStack {
-            List {
-                Section("BUNDLED") {
-                    ForEach(GameClient.bundled) { client in
-                        Button {
-                            selectClient(client)
-                        } label: {
-                            SelectorRow(client: client, cover: coverImage(for: client))
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(client.url == nil)
-                        .id("\(client.id)-\(coverRevision)")
-                        .contextMenu {
-                            coverMenuItems(for: client)
-                            if client.id == "bundled:reVCDOS" {
-                                Button {
-                                    downloadErrorMessage = nil
-                                    downloadProgress = 0
-                                    downloadStatus = "Ready to download"
-                                    showingAssetDownload = true
-                                } label: {
-                                    Label("Download full assets…", systemImage: "arrow.down.circle")
-                                }
-                                if let root = ReVCDOSAssetStore.rootURL(),
-                                   ReVCDOSAssetStore.isReady(at: root) {
-                                    Button(role: .destructive) {
-                                        showingDeleteAssetsConfirmation = true
-                                    } label: {
-                                        Label("Delete downloaded assets", systemImage: "trash")
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Section {
-                    if customClients.isEmpty {
-                        Text("No custom clients yet. Add a single .html client file from Files.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(customClients) { client in
-                            Button {
-                                selectClient(client)
-                            } label: {
-                                SelectorRow(client: client, cover: coverImage(for: client))
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(client.url == nil)
-                            .id("\(client.id)-\(coverRevision)")
-                            .contextMenu {
-                                coverMenuItems(for: client)
-                                Button(role: .destructive) {
-                                    removeCustomClient(client)
-                                } label: {
-                                    Label("Remove Client", systemImage: "trash")
-                                }
-                            }
-                        }
-                    }
-                } header: {
-                    Text("CUSTOM")
-                } footer: {
-                    Text("Swipe down in the top-left corner to reveal Quit. 1.8.8-wasm may need single-thread if it hangs starting the integrated server.")
-                        .font(.footnote)
-                }
+    private var libraryTab: some View {
+        LibraryView(
+            bundledClients: GameClient.bundled,
+            customClients: customClients,
+            coverImage: { coverImage(for: $0) },
+            coverRevision: coverRevision,
+            onSelect: { selectClient($0) },
+            onAddClient: { showingFileImporter = true },
+            onRemoveClient: { removeCustomClient($0) },
+            coverMenuItems: { client in
+                AnyView(coverMenuItems(for: client))
+            },
+            reVCDOSMenuItems: { client in
+                AnyView(reVCDOSContextItems(for: client))
             }
-            .listStyle(.insetGrouped)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showingFileImporter = true
-                    } label: {
-                        Label("Add Client from Files", systemImage: "plus")
-                    }
+        )
+    }
+
+    @ViewBuilder
+    private func reVCDOSContextItems(for client: GameClient) -> some View {
+        if client.id == "bundled:reVCDOS" {
+            Button {
+                downloadErrorMessage = nil
+                downloadProgress = 0
+                downloadStatus = "Ready to download"
+                showingAssetDownload = true
+            } label: {
+                Label("Download full assets…", systemImage: "arrow.down.circle")
+            }
+            if let root = ReVCDOSAssetStore.rootURL(),
+               ReVCDOSAssetStore.isReady(at: root) {
+                Button(role: .destructive) {
+                    showingDeleteAssetsConfirmation = true
+                } label: {
+                    Label("Delete downloaded assets", systemImage: "trash")
                 }
             }
         }
