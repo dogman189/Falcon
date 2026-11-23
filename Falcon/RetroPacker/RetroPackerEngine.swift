@@ -10,19 +10,36 @@ final class RetroPackerEngine: NSObject, WKScriptMessageHandler {
     var onComplete: ((String, Data) -> Void)?
     var onError: ((String) -> Void)?
 
-    private var webView: WKWebView?
+    /// Exposed so Task 7 can host this web view in a view hierarchy (off-screen
+    /// if needed). The instance may be replaced after a reset/reload.
+    var webView: WKWebView? { _webView }
+
+    private var _webView: WKWebView?
     private var isLoaded = false
     private var currentRequestID: String?
     private var pendingPack: (() -> Void)?
+    private var timeoutTask: Task<Void, Never>?
 
     func loadIfNeeded() {
-        if webView != nil {
+        if _webView != nil {
+            return
+        }
+
+        guard let url = packerResourceURL() else {
+            if currentRequestID != nil {
+                timeoutTask?.cancel()
+                timeoutTask = nil
+                let id = currentRequestID
+                currentRequestID = nil
+                onError?("Missing retro packer resource (pack_game_en.html).")
+                _ = id
+            }
             return
         }
 
         let configuration = WKWebViewConfiguration()
         let controller = WKUserContentController()
-        controller.add(self, name: "falconRetroPacker")
+        controller.add(RetroPackerMessageProxy(owner: self), name: "falconRetroPacker")
         configuration.userContentController = controller
 
         let webView = WKWebView(frame: .zero, configuration: configuration)
@@ -32,18 +49,12 @@ final class RetroPackerEngine: NSObject, WKScriptMessageHandler {
             webView.isInspectable = true
         }
         #endif
-        self.webView = webView
+        _webView = webView
 
-        guard let url = packerResourceURL() else {
-            onError?("Missing retro packer resource (pack_game_en.html).")
-            return
-        }
         webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
     }
 
     func pack(romData: Data, romName: String, system: String, title: String, color: String = "#FF4444") {
-        loadIfNeeded()
-
         let id = UUID().uuidString
         currentRequestID = id
 
@@ -56,9 +67,22 @@ final class RetroPackerEngine: NSObject, WKScriptMessageHandler {
             color: color
         )
 
+        loadIfNeeded()
+        guard _webView != nil else {
+            // loadIfNeeded already reported the failure (if any).
+            if currentRequestID == id {
+                currentRequestID = nil
+            }
+            timeoutTask?.cancel()
+            timeoutTask = nil
+            return
+        }
+
+        startTimeout(for: id)
+
         let perform: () -> Void = { [weak self] in
             guard let self else { return }
-            guard let webView = self.webView else { return }
+            guard let webView = self._webView else { return }
             do {
                 let encoder = JSONEncoder()
                 let data = try encoder.encode(request)
@@ -70,6 +94,8 @@ final class RetroPackerEngine: NSObject, WKScriptMessageHandler {
                     Task { @MainActor in
                         guard let self else { return }
                         if let error, self.currentRequestID == id {
+                            self.timeoutTask?.cancel()
+                            self.timeoutTask = nil
                             self.currentRequestID = nil
                             self.onError?(error.localizedDescription)
                         }
@@ -77,6 +103,8 @@ final class RetroPackerEngine: NSObject, WKScriptMessageHandler {
                 }
             } catch {
                 if self.currentRequestID == id {
+                    self.timeoutTask?.cancel()
+                    self.timeoutTask = nil
                     self.currentRequestID = nil
                     self.onError?(error.localizedDescription)
                 }
@@ -91,19 +119,22 @@ final class RetroPackerEngine: NSObject, WKScriptMessageHandler {
     }
 
     func cancel() {
+        timeoutTask?.cancel()
+        timeoutTask = nil
         currentRequestID = nil
         pendingPack = nil
-        isLoaded = false
-
-        guard let webView else { return }
-        webView.stopLoading()
-        guard let url = packerResourceURL() else { return }
-        webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
+        resetWebView()
+        loadIfNeeded()
     }
 
     // MARK: - WKScriptMessageHandler
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        // Forwarded by the proxy; kept to satisfy the protocol if registered directly.
+        handleScriptMessage(message)
+    }
+
+    func handleScriptMessage(_ message: WKScriptMessage) {
         guard message.name == "falconRetroPacker" else { return }
         guard let event = RetroPackerBridgeParser.parse(message.body) else { return }
 
@@ -114,6 +145,8 @@ final class RetroPackerEngine: NSObject, WKScriptMessageHandler {
 
         case .complete(let id, let fileName, let htmlBase64):
             guard id == currentRequestID else { return }
+            timeoutTask?.cancel()
+            timeoutTask = nil
             currentRequestID = nil
             guard let htmlData = Data(base64Encoded: htmlBase64) else {
                 onError?("Unable to decode generated HTML.")
@@ -123,12 +156,46 @@ final class RetroPackerEngine: NSObject, WKScriptMessageHandler {
 
         case .failed(let id, let messageText):
             guard id == currentRequestID else { return }
+            timeoutTask?.cancel()
+            timeoutTask = nil
             currentRequestID = nil
             onError?(messageText)
         }
     }
 
-    // MARK: - Resource loading
+    // MARK: - Internals
+
+    private func startTimeout(for id: String) {
+        timeoutTask?.cancel()
+        timeoutTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 300_000_000_000)
+            guard let self else { return }
+            guard self.currentRequestID == id else { return }
+            self.currentRequestID = nil
+            self.timeoutTask = nil
+            self.resetWebView()
+            self.onError?("Packing timed out.")
+        }
+    }
+
+    private func resetWebView(reportingError message: String? = nil) {
+        timeoutTask?.cancel()
+        timeoutTask = nil
+
+        if let webView = _webView {
+            webView.stopLoading()
+            webView.navigationDelegate = nil
+            webView.configuration.userContentController.removeScriptMessageHandler(forName: "falconRetroPacker")
+            _webView = nil
+        }
+        isLoaded = false
+        pendingPack = nil
+
+        if let message, currentRequestID != nil {
+            currentRequestID = nil
+            onError?(message)
+        }
+    }
 
     private func packerResourceURL() -> URL? {
         if let url = Bundle.main.url(forResource: "pack_game_en", withExtension: "html", subdirectory: "RetroPacker"),
@@ -155,6 +222,7 @@ final class RetroPackerEngine: NSObject, WKScriptMessageHandler {
 
 extension RetroPackerEngine: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        guard webView === _webView else { return }
         isLoaded = true
         if let pending = pendingPack {
             pendingPack = nil
@@ -163,24 +231,32 @@ extension RetroPackerEngine: WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-        if currentRequestID != nil {
-            currentRequestID = nil
-            onError?(error.localizedDescription)
-        }
+        guard webView === _webView else { return }
+        resetWebView(reportingError: error.localizedDescription)
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-        if currentRequestID != nil {
-            currentRequestID = nil
-            onError?(error.localizedDescription)
-        }
+        guard webView === _webView else { return }
+        resetWebView(reportingError: error.localizedDescription)
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-        isLoaded = false
-        if currentRequestID != nil {
-            currentRequestID = nil
-            onError?("The retro packer stopped unexpectedly.")
+        guard webView === _webView else { return }
+        resetWebView(reportingError: "The retro packer stopped unexpectedly.")
+    }
+}
+
+/// Lightweight proxy so `WKUserContentController` does not retain the engine.
+private final class RetroPackerMessageProxy: NSObject, WKScriptMessageHandler {
+    weak var owner: RetroPackerEngine?
+
+    init(owner: RetroPackerEngine) {
+        self.owner = owner
+    }
+
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        Task { @MainActor [weak self] in
+            self?.owner?.handleScriptMessage(message)
         }
     }
 }
