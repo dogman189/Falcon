@@ -71,17 +71,12 @@ enum RetroPackerBridgeParser {
     /// Accepts any numeric bridging for `percent` (`Double`, `Int`, `NSNumber`)
     /// while rejecting strings, booleans, NaN and infinity.
     private static func double(_ value: Any?) -> Double? {
-        guard let value else { return nil }
-        // Booleans bridge to NSNumber on Darwin, so exclude them explicitly.
-        if value is Bool { return nil }
-        let number: Double
-        if let double = value as? Double {
-            number = double
-        } else if let nsNumber = value as? NSNumber {
-            number = nsNumber.doubleValue
-        } else {
-            return nil
-        }
-        return number.isFinite ? number : nil
+        guard let number = value as? NSNumber else { return nil }
+        // Booleans bridge to CFBoolean-backed NSNumbers. Do not use `is Bool`:
+        // on Darwin numeric 0/1 (including JSON-decoded and `NSNumber` values)
+        // also satisfies it, which would drop 0% and 100% progress messages.
+        if CFGetTypeID(number) == CFBooleanGetTypeID() { return nil }
+        let result = number.doubleValue
+        return result.isFinite ? result : nil
     }
 }

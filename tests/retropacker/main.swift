@@ -20,6 +20,12 @@ func runTests() {
     testParsesFailureEvent()
     testIgnoresUnknownEvent()
     testAcceptsIntegerPercent()
+    testParsesNSNumberBoundaryPercents()
+    do {
+        try testParsesJSONDecodedBoundaryPercents()
+    } catch {
+        fatalError("JSON-decoded boundary percent test failed: \(error)")
+    }
     testRejectsPayloadsMissingRequiredKeys()
     testRejectsMalformedProgressPercent()
     testIgnoresNonDictionaryBody()
