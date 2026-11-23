@@ -16,6 +16,7 @@ struct ContentView: View {
     @State private var clientFailure: String?
     @State private var customClients: [GameClient] = []
     @State private var showingFileImporter = false
+    @State private var showingRetroPacker = false
     @State private var importErrorMessage: String?
     @State private var showingImportError = false
     @State private var snapshotter = WebViewSnapshotter()
@@ -97,6 +98,17 @@ struct ContentView: View {
             allowsMultipleSelection: false
         ) { result in
             handleImport(result)
+        }
+        .sheet(isPresented: $showingRetroPacker) {
+            RetroPackerView(
+                onImported: { _ in
+                    loadClients()
+                    showingRetroPacker = false
+                },
+                onCancel: {
+                    showingRetroPacker = false
+                }
+            )
         }
         .fileImporter(
             isPresented: $showingCoverFileImporter,
@@ -323,10 +335,19 @@ struct ContentView: View {
             .listStyle(.insetGrouped)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showingFileImporter = true
+                    Menu {
+                        Button {
+                            showingFileImporter = true
+                        } label: {
+                            Label("Add Client from Files", systemImage: "doc")
+                        }
+                        Button {
+                            showingRetroPacker = true
+                        } label: {
+                            Label("Pack Retro Game", systemImage: "shippingbox")
+                        }
                     } label: {
-                        Label("Add Client", systemImage: "plus")
+                        Label("Add", systemImage: "plus")
                     }
                 }
             }
