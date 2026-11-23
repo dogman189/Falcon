@@ -6,7 +6,7 @@ import WebKit
 /// client using the hidden `RetroPackerEngine`.
 struct RetroPackerView: View {
     let onImported: (GameClient) -> Void
-    let onCancel: () -> Void
+    let onCancel: (() -> Void)?
 
     @State private var engine = RetroPackerEngine()
 
@@ -123,12 +123,14 @@ struct RetroPackerView: View {
             .listStyle(.insetGrouped)
             .navigationTitle("Pack a Game")
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") {
-                        if isPacking {
-                            cancelPacking()
+                if let onCancel {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Cancel") {
+                            if isPacking {
+                                cancelPacking()
+                            }
+                            onCancel()
                         }
-                        onCancel()
                     }
                 }
             }

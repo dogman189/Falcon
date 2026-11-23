@@ -10,13 +10,18 @@ import PhotosUI
 import UniformTypeIdentifiers
 
 struct ContentView: View {
+    private enum AppTab: Hashable {
+        case library
+        case packer
+    }
+
     @State private var selectedClient: GameClient?
     @State private var quitRevealed = false
     @State private var quitHideTask: Task<Void, Never>?
     @State private var clientFailure: String?
     @State private var customClients: [GameClient] = []
+    @State private var selectedTab: AppTab = .library
     @State private var showingFileImporter = false
-    @State private var showingRetroPacker = false
     @State private var importErrorMessage: String?
     @State private var showingImportError = false
     @State private var snapshotter = WebViewSnapshotter()
@@ -77,7 +82,25 @@ struct ContentView: View {
                     )
                 }
             } else {
-                clientSelector
+                TabView(selection: $selectedTab) {
+                    clientSelector
+                        .tag(AppTab.library)
+                        .tabItem {
+                            Label("Library", systemImage: "gamecontroller")
+                        }
+
+                    RetroPackerView(
+                        onImported: { _ in
+                            loadClients()
+                            selectedTab = .library
+                        },
+                        onCancel: nil
+                    )
+                    .tag(AppTab.packer)
+                    .tabItem {
+                        Label("Packer", systemImage: "shippingbox")
+                    }
+                }
             }
         }
         .onChange(of: selectedClient) { _, _ in
@@ -98,17 +121,6 @@ struct ContentView: View {
             allowsMultipleSelection: false
         ) { result in
             handleImport(result)
-        }
-        .sheet(isPresented: $showingRetroPacker) {
-            RetroPackerView(
-                onImported: { _ in
-                    loadClients()
-                    showingRetroPacker = false
-                },
-                onCancel: {
-                    showingRetroPacker = false
-                }
-            )
         }
         .fileImporter(
             isPresented: $showingCoverFileImporter,
@@ -335,19 +347,10 @@ struct ContentView: View {
             .listStyle(.insetGrouped)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Button {
-                            showingFileImporter = true
-                        } label: {
-                            Label("Add Client from Files", systemImage: "doc")
-                        }
-                        Button {
-                            showingRetroPacker = true
-                        } label: {
-                            Label("Pack Retro Game", systemImage: "shippingbox")
-                        }
+                    Button {
+                        showingFileImporter = true
                     } label: {
-                        Label("Add", systemImage: "plus")
+                        Label("Add Client from Files", systemImage: "plus")
                     }
                 }
             }
