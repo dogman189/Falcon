@@ -148,6 +148,17 @@ struct RetroPackerView: View {
                 engine.loadIfNeeded()
                 wireCallbacks()
             }
+            .onDisappear {
+                // Break the engine -> callback -> view retain cycle and stop any
+                // in-flight pack when the screen goes away (cancel button, swipe
+                // dismiss, or parent removal).
+                engine.onProgress = nil
+                engine.onComplete = nil
+                engine.onError = nil
+                if isPacking {
+                    engine.cancel()
+                }
+            }
             .overlay(alignment: .bottomTrailing) {
                 // Host the engine's WKWebView invisibly so iOS does not throttle it.
                 RetroPackerEngineHost(engine: engine)
