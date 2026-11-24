@@ -335,6 +335,7 @@ struct RetroPackerView: View {
             .scrollContentBackground(.hidden)
             .background(settings.backgroundColor)
             .navigationTitle("Pack a Game")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(settings.backgroundColor, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
