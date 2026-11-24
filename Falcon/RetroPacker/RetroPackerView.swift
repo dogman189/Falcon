@@ -192,7 +192,7 @@ struct RetroPackerView: View {
                             Spacer()
                             if focusedField == 0 && controllerManager.isConnected {
                                 Image(systemName: "button.programmable")
-                                    .foregroundStyle(.white.opacity(0.7))
+                                    .foregroundStyle(settings.appTheme.secondaryText)
                             }
                         }
                     }
@@ -228,10 +228,10 @@ struct RetroPackerView: View {
                                 Image(systemName: "chevron.right")
                             }
                             .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(.white.opacity(0.8))
+                            .foregroundStyle(settings.appTheme.secondaryText)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 3)
-                            .background(Color.white.opacity(0.15))
+                            .background(settings.appTheme.subtleFill)
                             .clipShape(Capsule())
                         }
                     }
@@ -349,10 +349,10 @@ struct RetroPackerView: View {
                             Text(controllerManager.controllerName)
                                 .font(.caption.weight(.semibold))
                         }
-                        .foregroundStyle(.white.opacity(0.8))
+                        .foregroundStyle(settings.appTheme.secondaryText)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(Color.white.opacity(0.1))
+                        .background(settings.appTheme.subtleFill)
                         .clipShape(Capsule())
                     }
                 }
@@ -423,16 +423,17 @@ struct RetroPackerView: View {
     @ViewBuilder
     private func rowBackground(for fieldIndex: Int, isPrimaryButton: Bool = false) -> some View {
         let isFocused = (focusedField == fieldIndex && controllerManager.isConnected)
+        let base = settings.appTheme.primaryText
         ZStack {
             if isPrimaryButton {
-                isFocused ? Color.white.opacity(0.25) : Color.white.opacity(0.1)
+                isFocused ? base.opacity(0.25) : base.opacity(0.1)
             } else {
-                isFocused ? Color.white.opacity(0.12) : Color.white.opacity(0.06)
+                isFocused ? base.opacity(0.12) : settings.appTheme.subtleFill
             }
 
             if isFocused {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(Color.white, lineWidth: 2)
+                    .strokeBorder(base, lineWidth: 2)
             }
         }
     }
@@ -443,11 +444,11 @@ struct RetroPackerView: View {
                 .font(.system(size: 11, weight: .heavy, design: .rounded))
                 .padding(.horizontal, 5)
                 .padding(.vertical, 2)
-                .background(Color.white.opacity(0.2))
+                .background(settings.appTheme.subtleFill)
                 .clipShape(Capsule())
             Text(label)
                 .font(.caption2.weight(.medium))
-                .foregroundStyle(.white.opacity(0.75))
+                .foregroundStyle(settings.appTheme.secondaryText)
         }
     }
 

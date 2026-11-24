@@ -123,13 +123,13 @@ struct ContentView: View {
                             Label("Settings", systemImage: "gearshape")
                         }
                 }
-                .tint(.white)
+                .tint(settings.appTheme.primaryText)
                 .toolbarBackground(settings.backgroundColor, for: .tabBar)
                 .toolbarBackground(.visible, for: .tabBar)
                 .appChromeScale(settings.uiScale)
             }
         }
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(settings.appTheme.preferredColorScheme)
         .onChange(of: selectedClient) { _, newClient in
             hideQuit()
             if selectedClient == nil {
@@ -300,7 +300,7 @@ struct ContentView: View {
         .padding(32)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(settings.backgroundColor)
-        .foregroundStyle(.white)
+        .foregroundStyle(settings.appTheme.primaryText)
         .ignoresSafeArea()
     }
 

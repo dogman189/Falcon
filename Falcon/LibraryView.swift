@@ -82,45 +82,45 @@ struct LibraryView: View {
                             HStack(spacing: 14) {
                                 Image(systemName: "shippingbox.fill")
                                     .font(.title2)
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(settings.appTheme.primaryText)
                                     .frame(width: 44, height: 44)
-                                    .background(Color.white.opacity(0.12))
+                                    .background(settings.appTheme.subtleFill)
                                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
 
                                 VStack(alignment: .leading, spacing: 2) {
                                     HStack {
                                         Text("Pack a Retro Game")
                                             .font(.subheadline.bold())
-                                            .foregroundStyle(.white)
+                                            .foregroundStyle(settings.appTheme.primaryText)
                                         Spacer()
                                         if controllerManager.isConnected {
                                             Text("RB")
                                                 .font(.system(size: 10, weight: .heavy, design: .rounded))
                                                 .padding(.horizontal, 6)
                                                 .padding(.vertical, 2)
-                                                .background(Color.white.opacity(0.2))
+                                                .background(settings.appTheme.subtleFill)
                                                 .clipShape(Capsule())
-                                                .foregroundStyle(.white)
+                                                .foregroundStyle(settings.appTheme.primaryText)
                                         }
                                     }
                                     Text("Convert a ROM you own into a portable web game")
                                         .font(.caption)
-                                        .foregroundStyle(.white.opacity(0.6))
+                                        .foregroundStyle(settings.appTheme.secondaryText)
                                 }
                             }
                             .padding(14)
-                            .background(Color.white.opacity(focusedSection == 3 ? 0.12 : 0.05))
+                            .background(settings.appTheme.primaryText.opacity(focusedSection == 3 ? 0.12 : 0.05))
                             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                                     .strokeBorder(
-                                        focusedSection == 3 ? Color.white : Color.white.opacity(0.12),
+                                        focusedSection == 3 ? settings.appTheme.primaryText : settings.appTheme.border,
                                         lineWidth: focusedSection == 3 ? 2.5 : 1
                                     )
                             )
                             .scaleEffect(focusedSection == 3 ? 1.02 : 1.0)
                             .shadow(
-                                color: focusedSection == 3 ? Color.white.opacity(0.25) : Color.clear,
+                                color: focusedSection == 3 ? settings.appTheme.primaryText.opacity(0.18) : Color.clear,
                                 radius: 8,
                                 y: 3
                             )
@@ -140,10 +140,10 @@ struct LibraryView: View {
                                     buttonLegendItem(button: "✛", label: "Navigate")
                                 }
                                 .font(.caption.weight(.medium))
-                                .foregroundStyle(.white.opacity(0.7))
+                                .foregroundStyle(settings.appTheme.secondaryText)
                                 .padding(.vertical, 6)
                                 .padding(.horizontal, 14)
-                                .background(Color.white.opacity(0.08))
+                                .background(settings.appTheme.subtleFill)
                                 .clipShape(Capsule())
                             }
 
@@ -153,7 +153,7 @@ struct LibraryView: View {
                                 Text("Swipe down in the top-left corner to reveal Quit while in-game.")
                                     .font(.footnote)
                             }
-                            .foregroundStyle(.white.opacity(0.35))
+                            .foregroundStyle(settings.appTheme.secondaryText.opacity(0.7))
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.top, 6)
@@ -193,10 +193,10 @@ struct LibraryView: View {
                             Text(controllerManager.controllerName)
                                 .font(.caption.weight(.semibold))
                         }
-                        .foregroundStyle(.white.opacity(0.8))
+                        .foregroundStyle(settings.appTheme.secondaryText)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(Color.white.opacity(0.1))
+                        .background(settings.appTheme.subtleFill)
                         .clipShape(Capsule())
                     }
                 }
@@ -207,7 +207,7 @@ struct LibraryView: View {
                     } label: {
                         Image(systemName: "plus")
                             .font(.body.weight(.semibold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(settings.appTheme.primaryText)
                     }
                     .accessibilityLabel("Add Client from Files")
                 }
@@ -233,14 +233,14 @@ struct LibraryView: View {
             HStack(spacing: 8) {
                 Text(title)
                     .font(.title3.weight(.bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(settings.appTheme.primaryText)
 
                 Text("\(count)")
                     .font(.caption2.weight(.bold))
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(settings.appTheme.secondaryText)
                     .padding(.horizontal, 7)
                     .padding(.vertical, 2)
-                    .background(Color.white.opacity(0.12))
+                    .background(settings.appTheme.subtleFill)
                     .clipShape(Capsule())
 
                 Spacer()
@@ -249,7 +249,7 @@ struct LibraryView: View {
                     Button(action: onAddClient) {
                         Image(systemName: "plus.circle")
                             .font(.subheadline)
-                            .foregroundStyle(.white.opacity(0.6))
+                            .foregroundStyle(settings.appTheme.secondaryText)
                     }
                 }
             }
@@ -327,11 +327,11 @@ struct LibraryView: View {
                 .font(.system(size: 11, weight: .heavy, design: .rounded))
                 .padding(.horizontal, 5)
                 .padding(.vertical, 2)
-                .background(Color.white.opacity(0.2))
+                .background(settings.appTheme.subtleFill)
                 .clipShape(Capsule())
             Text(label)
                 .font(.caption2.weight(.medium))
-                .foregroundStyle(.white.opacity(0.75))
+                .foregroundStyle(settings.appTheme.secondaryText)
         }
     }
 

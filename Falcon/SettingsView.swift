@@ -50,7 +50,7 @@ struct SettingsView: View {
                     in: 0...Double(AppSettings.uiScaleNotches.count - 1),
                     step: 1
                 )
-                .tint(.white)
+                .tint(settings.appTheme.primaryText)
 
                 notchLabels(for: AppSettings.uiScaleNotches, selected: settings.uiScale)
             }
@@ -77,7 +77,7 @@ struct SettingsView: View {
                     in: 0...Double(AppSettings.webScaleNotches.count - 1),
                     step: 1
                 )
-                .tint(.white)
+                .tint(settings.appTheme.primaryText)
 
                 notchLabels(for: AppSettings.webScaleNotches, selected: settings.webScale)
             }
@@ -103,7 +103,7 @@ struct SettingsView: View {
     }
 
     private var rowBackground: some View {
-        Color.white.opacity(0.06)
+        settings.appTheme.subtleFill
     }
 
     private func percentLabel(_ value: Double) -> String {
@@ -116,7 +116,7 @@ struct SettingsView: View {
             ForEach(notches, id: \.self) { notch in
                 Text(percentLabel(notch))
                     .font(.caption2.weight(abs(notch - selected) < 0.001 ? .bold : .regular))
-                    .foregroundStyle(abs(notch - selected) < 0.001 ? .white : .white.opacity(0.45))
+                    .foregroundStyle(abs(notch - selected) < 0.001 ? settings.appTheme.primaryText : settings.appTheme.secondaryText)
                 if notch != notches.last {
                     Spacer()
                 }

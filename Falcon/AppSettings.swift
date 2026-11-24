@@ -5,6 +5,7 @@ import UIKit
 enum AppTheme: String, CaseIterable, Identifiable {
     case darkBlue
     case black
+    case light
 
     var id: String { rawValue }
 
@@ -12,6 +13,7 @@ enum AppTheme: String, CaseIterable, Identifiable {
         switch self {
         case .darkBlue: return "Dark Blue"
         case .black: return "Black"
+        case .light: return "Light"
         }
     }
 
@@ -19,6 +21,7 @@ enum AppTheme: String, CaseIterable, Identifiable {
         switch self {
         case .darkBlue: return Color(red: 11 / 255, green: 20 / 255, blue: 38 / 255)
         case .black: return .black
+        case .light: return Color(red: 0.95, green: 0.96, blue: 0.98)
         }
     }
 
@@ -26,6 +29,42 @@ enum AppTheme: String, CaseIterable, Identifiable {
         switch self {
         case .darkBlue: return UIColor(red: 11 / 255, green: 20 / 255, blue: 38 / 255, alpha: 1)
         case .black: return .black
+        case .light: return UIColor(red: 0.95, green: 0.96, blue: 0.98, alpha: 1)
+        }
+    }
+
+    var preferredColorScheme: ColorScheme {
+        switch self {
+        case .darkBlue, .black: return .dark
+        case .light: return .light
+        }
+    }
+
+    var primaryText: Color {
+        switch self {
+        case .darkBlue, .black: return .white
+        case .light: return .black
+        }
+    }
+
+    var secondaryText: Color {
+        switch self {
+        case .darkBlue, .black: return .white.opacity(0.7)
+        case .light: return .black.opacity(0.65)
+        }
+    }
+
+    var subtleFill: Color {
+        switch self {
+        case .darkBlue, .black: return .white.opacity(0.08)
+        case .light: return .black.opacity(0.06)
+        }
+    }
+
+    var border: Color {
+        switch self {
+        case .darkBlue, .black: return .white.opacity(0.12)
+        case .light: return .black.opacity(0.12)
         }
     }
 }
