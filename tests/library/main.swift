@@ -6,6 +6,13 @@ func runTests() throws {
     try testRecordSessionEndAccumulatesPlaytime()
     try testSetSystemIDPersistsAcrossReload()
     try testRemoveDeletesClientMetadata()
+
+    try testResolveTypeUsesBundledDefaults()
+    try testResolveTypeUsesKnownRetroSystemID()
+    try testResolveTypeFallsBackToWebForUnknownCustom()
+    try testShelvesBuildRecentlyPlayedAndTypeShelves()
+    try testRecentlyPlayedIsCappedAndStillAppearsInTypeShelf()
+    try testTypeShelvesAreOrderedAndSortedByRecentThenName()
     print("ALL TESTS PASSED")
 }
 
