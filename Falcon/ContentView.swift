@@ -36,6 +36,8 @@ struct ContentView: View {
     @State private var showingCoverFileImporter = false
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var coverRevision = 0
+    @State private var autoCoverFetchIDs: Set<String> = []
+    private let coverService = WikipediaCoverService()
     @State private var reVCDOSServer: ReVCDOSLocalServer?
     @State private var webViewIdentity = 0
     @State private var showingAssetDownload = false
@@ -156,6 +158,7 @@ struct ContentView: View {
         }
         .task {
             loadClients()
+            autoFetchMissingCovers(for: GameClient.bundled + customClients)
             openDebugClientIfRequested()
             setupControllerTabSwitching()
         }
@@ -551,6 +554,47 @@ struct ContentView: View {
     private func loadClients() {
         customClients = CustomClientStore.shared.load()
         libraryRevision += 1
+        autoFetchMissingCovers(for: GameClient.bundled + customClients)
+    }
+
+    @MainActor
+    private func autoFetchMissingCovers(for clients: [GameClient]) {
+        for client in clients {
+            autoFetchCoverIfNeeded(for: client)
+        }
+    }
+
+    @MainActor
+    private func autoFetchCoverIfNeeded(for client: GameClient) {
+        guard !ClientCoverStore.shared.hasManualCover(for: client.id) else { return }
+        guard ClientCoverStore.shared.autoCoverURL(for: client.id) == nil else { return }
+        guard !autoCoverFetchIDs.contains(client.id) else { return }
+        autoCoverFetchIDs.insert(client.id)
+        Task {
+            await fetchAutoCover(for: client)
+        }
+    }
+
+    private func fetchAutoCover(for client: GameClient) async {
+        defer {
+            Task { @MainActor in
+                autoCoverFetchIDs.remove(client.id)
+            }
+        }
+        guard !ClientCoverStore.shared.hasManualCover(for: client.id) else { return }
+        guard ClientCoverStore.shared.autoCoverURL(for: client.id) == nil else { return }
+
+        do {
+            let candidate = try await coverService.bestCandidate(for: client.coverSearchName)
+            let data = try await coverService.downloadImageData(from: candidate.thumbnailURL)
+            let ext = candidate.thumbnailURL.pathExtension.isEmpty ? "jpg" : candidate.thumbnailURL.pathExtension
+            try? ClientCoverStore.shared.saveAuto(data: data, fileExtension: ext, for: client.id)
+            await MainActor.run {
+                coverRevision += 1
+            }
+        } catch {
+            // Network failures are non-fatal; keep built-in/default/current cover.
+        }
     }
 
     private func handleImport(_ result: Result<[URL], Error>) {
@@ -625,9 +669,9 @@ struct ContentView: View {
         } label: {
             Label("Set Cover from Files", systemImage: "folder")
         }
-        if ClientCoverStore.shared.coverURL(for: client.id) != nil {
+        if ClientCoverStore.shared.hasManualCover(for: client.id) {
             Button(role: .destructive) {
-                ClientCoverStore.shared.reset(for: client.id)
+                ClientCoverStore.shared.resetManualCover(for: client.id)
                 coverRevision += 1
             } label: {
                 Label("Reset Cover", systemImage: "arrow.uturn.backward")

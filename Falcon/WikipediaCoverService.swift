@@ -69,6 +69,25 @@ struct WikipediaCoverService: Sendable {
         return best
     }
 
+    func downloadImageData(from url: URL) async throws -> Data {
+        let data: Data
+        let response: URLResponse
+        var request = URLRequest(url: url)
+        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+        if let session = fetcher as? URLSession {
+            (data, response) = try await session.data(for: request)
+        } else {
+            (data, response) = try await fetcher.data(from: url)
+        }
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200,
+              !data.isEmpty else {
+            throw WikipediaCoverServiceError.invalidResponse
+        }
+        return data
+    }
+
     static func parseSearchResults(data: Data) throws -> [WikipediaCoverCandidate] {
         let root: Any
         do {
