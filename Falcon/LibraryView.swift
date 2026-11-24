@@ -16,6 +16,7 @@ struct LibraryView: View {
     let onOpenPacker: () -> Void
     @ViewBuilder let coverMenuItems: (GameClient) -> AnyView
     @ViewBuilder let reVCDOSMenuItems: (GameClient) -> AnyView
+    var isActiveTab: Bool = true
 
     @ObservedObject private var controllerManager = GameControllerManager.shared
     @State private var focusedClient: GameClient?
@@ -183,7 +184,14 @@ struct LibraryView: View {
         }
         .onAppear {
             clampFocusToAvailableContent()
-            setupControllerCallbacks()
+            if isActiveTab {
+                setupControllerCallbacks()
+            }
+        }
+        .onChange(of: isActiveTab) { _, active in
+            if active {
+                setupControllerCallbacks()
+            }
         }
     }
 

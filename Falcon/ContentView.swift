@@ -383,7 +383,8 @@ struct ContentView: View {
             },
             reVCDOSMenuItems: { client in
                 AnyView(reVCDOSContextItems(for: client))
-            }
+            },
+            isActiveTab: selectedTab == .library
         )
     }
 
