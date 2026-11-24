@@ -577,6 +577,7 @@ struct ContentView: View {
 
     @MainActor
     private func autoFetchCoverIfNeeded(for client: GameClient) {
+        guard !client.coverSearchName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         guard !ClientCoverStore.shared.hasManualCover(for: client.id) else { return }
         guard ClientCoverStore.shared.autoCoverURL(for: client.id) == nil else { return }
         guard !autoCoverFetchIDs.contains(client.id) else { return }
@@ -592,19 +593,21 @@ struct ContentView: View {
                 autoCoverFetchIDs.remove(client.id)
             }
         }
+        let searchName = client.coverSearchName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !searchName.isEmpty else { return }
         guard !ClientCoverStore.shared.hasManualCover(for: client.id) else { return }
         guard ClientCoverStore.shared.autoCoverURL(for: client.id) == nil else { return }
 
         do {
-            let candidate = try await coverService.bestCandidate(for: client.coverSearchName)
+            let candidate = try await coverService.bestCandidate(for: searchName)
             let data = try await coverService.downloadImageData(from: candidate.thumbnailURL)
             let ext = candidate.thumbnailURL.pathExtension.isEmpty ? "jpg" : candidate.thumbnailURL.pathExtension
-            try? ClientCoverStore.shared.saveAuto(data: data, fileExtension: ext, for: client.id)
+            try ClientCoverStore.shared.saveAuto(data: data, fileExtension: ext, for: client.id)
             await MainActor.run {
                 coverRevision += 1
             }
         } catch {
-            // Network failures are non-fatal; keep built-in/default/current cover.
+            // Failures are non-fatal; keep built-in/default/current cover.
         }
     }
 

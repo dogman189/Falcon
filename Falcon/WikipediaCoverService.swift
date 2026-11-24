@@ -1,6 +1,8 @@
 import Foundation
 
-struct WikipediaCoverCandidate: Equatable, Sendable {
+struct WikipediaCoverCandidate: Equatable, Sendable, Identifiable {
+    var id: String { "\(title)\n\(thumbnailURL.absoluteString)" }
+
     let title: String
     let description: String?
     let thumbnailURL: URL

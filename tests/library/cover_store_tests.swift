@@ -93,11 +93,13 @@ func testRemoveAllCoversDeletesManualAndAuto() throws {
     let store = ClientCoverStore(fileManager: fileManager, baseDirectoryURL: root)
     let id = "game-4"
 
-    let legacyURL = root.appendingPathComponent("game-4.jpg")
-    try makeTestImageData().write(to: legacyURL, options: .atomic)
-
     try store.saveManual(data: makeTestImageData(), fileExtension: "png", for: id)
     try store.saveAuto(data: makeTestImageData(), fileExtension: "jpg", for: id)
+
+    // Pin legacy removal directly: legacy file must still exist when removeAllCovers is called.
+    let legacyURL = root.appendingPathComponent("game-4.jpg")
+    try makeTestImageData().write(to: legacyURL, options: .atomic)
+    assert(fileManager.fileExists(atPath: legacyURL.path) == true)
 
     assert(store.manualCoverURL(for: id) != nil)
     assert(store.autoCoverURL(for: id) != nil)

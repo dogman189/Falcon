@@ -10,6 +10,7 @@ struct CoverSearchSheet: View {
     @State private var results: [WikipediaCoverCandidate] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var latestSearchRequestID = 0
 
     init(client: GameClient, service: WikipediaCoverService, onPick: @escaping (WikipediaCoverCandidate) -> Void) {
         self.client = client
@@ -41,7 +42,7 @@ struct CoverSearchSheet: View {
                         description: Text("Try a different search term.")
                     )
                 } else {
-                    List(results, id: \.thumbnailURL) { candidate in
+                    List(results) { candidate in
                         Button {
                             onPick(candidate)
                         } label: {
@@ -121,21 +122,27 @@ struct CoverSearchSheet: View {
     @MainActor
     private func performSearch() async {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        latestSearchRequestID += 1
+        let requestID = latestSearchRequestID
         guard !trimmed.isEmpty else {
             results = []
             errorMessage = nil
+            isLoading = false
             return
         }
         isLoading = true
         errorMessage = nil
         do {
             let fetched = try await service.search(term: trimmed)
+            guard requestID == latestSearchRequestID else { return }
             results = fetched
         } catch {
+            guard requestID == latestSearchRequestID else { return }
             if results.isEmpty {
                 errorMessage = "Could not load results. Check your connection and try again."
             }
         }
+        guard requestID == latestSearchRequestID else { return }
         isLoading = false
     }
 }
