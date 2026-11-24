@@ -23,6 +23,7 @@ struct ContentView: View {
     @State private var quitHideTask: Task<Void, Never>?
     @State private var clientFailure: String?
     @State private var customClients: [GameClient] = []
+    @State private var libraryRevision = 0
     @State private var selectedTab: AppTab = .library
     @State private var retroPackerModel = RetroPackerModel()
     @State private var showingFileImporter = false
@@ -279,6 +280,7 @@ struct ContentView: View {
             at: Date(),
             store: .shared
         )
+        libraryRevision += 1
     }
 
     private func finalizeLaunchSession() {
@@ -287,6 +289,7 @@ struct ContentView: View {
             at: Date(),
             store: .shared
         )
+        libraryRevision += 1
     }
 
     private func failureView(title: String, message: String) -> some View {
@@ -325,9 +328,13 @@ struct ContentView: View {
     }
 
     private var libraryTab: some View {
-        LibraryView(
-            bundledClients: GameClient.bundled,
-            customClients: customClients,
+        let _ = libraryRevision
+        let shelves = LibraryShelfBuilder.shelves(
+            for: GameClient.bundled + customClients,
+            metadataByID: ClientLibraryMetadataStore.shared.allMetadata()
+        )
+        return LibraryView(
+            shelves: shelves,
             coverImage: { coverImage(for: $0) },
             coverRevision: coverRevision,
             onSelect: { selectClient($0) },
@@ -493,6 +500,7 @@ struct ContentView: View {
 
     private func loadClients() {
         customClients = CustomClientStore.shared.load()
+        libraryRevision += 1
     }
 
     private func handleImport(_ result: Result<[URL], Error>) {
@@ -522,6 +530,7 @@ struct ContentView: View {
             clientFailure = nil
         }
         CustomClientStore.shared.remove(client)
+        ClientLibraryMetadataStore.shared.remove(clientID: client.id)
         loadClients()
     }
 

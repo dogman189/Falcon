@@ -140,3 +140,28 @@ func testTypeShelvesAreOrderedAndSortedByRecentThenName() throws {
     let gbaShelf = typeShelves.first { $0.id == "type:system:gba" }
     assert(gbaShelf?.clients.map(\.id) == [gbaA.id, gbaZ.id])
 }
+
+func testLibraryNavigationModelMapsDynamicSectionsWithPackerLast() throws {
+    let empty = LibraryNavigationModel(shelfCount: 0)
+    assert(empty.heroSection == 0)
+    assert(empty.packerSection == 1)
+    assert(empty.maxSection == 1)
+    assert(empty.isShelfSection(0) == false)
+    assert(empty.isShelfSection(1) == false)
+    assert(empty.shelfIndex(forSection: 1) == nil)
+
+    let threeShelves = LibraryNavigationModel(shelfCount: 3)
+    assert(threeShelves.heroSection == 0)
+    assert(threeShelves.packerSection == 4)
+    assert(threeShelves.maxSection == 4)
+    assert(threeShelves.isShelfSection(1))
+    assert(threeShelves.isShelfSection(3))
+    assert(threeShelves.isShelfSection(4) == false)
+    assert(threeShelves.shelfIndex(forSection: 1) == 0)
+    assert(threeShelves.shelfIndex(forSection: 3) == 2)
+    assert(threeShelves.section(forShelfIndex: 0) == 1)
+    assert(threeShelves.section(forShelfIndex: 2) == 3)
+    assert(threeShelves.section(forShelfIndex: 3) == nil)
+    assert(threeShelves.clampedSection(-1) == 0)
+    assert(threeShelves.clampedSection(9) == 4)
+}

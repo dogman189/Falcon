@@ -144,3 +144,29 @@ enum LibraryShelfBuilder {
         }
     }
 }
+
+struct LibraryNavigationModel {
+    let shelfCount: Int
+
+    var heroSection: Int { 0 }
+    var packerSection: Int { shelfCount + 1 }
+    var maxSection: Int { packerSection }
+
+    func isShelfSection(_ section: Int) -> Bool {
+        section >= 1 && section <= shelfCount
+    }
+
+    func shelfIndex(forSection section: Int) -> Int? {
+        guard isShelfSection(section) else { return nil }
+        return section - 1
+    }
+
+    func section(forShelfIndex index: Int) -> Int? {
+        guard index >= 0 && index < shelfCount else { return nil }
+        return index + 1
+    }
+
+    func clampedSection(_ section: Int) -> Int {
+        max(0, min(maxSection, section))
+    }
+}

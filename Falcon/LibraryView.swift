@@ -7,8 +7,7 @@ struct LibraryView: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @EnvironmentObject private var settings: AppSettings
 
-    let bundledClients: [GameClient]
-    let customClients: [GameClient]
+    let shelves: [LibraryShelf]
     let coverImage: (GameClient) -> Image
     let coverRevision: Int
     let onSelect: (GameClient) -> Void
@@ -20,17 +19,36 @@ struct LibraryView: View {
 
     @ObservedObject private var controllerManager = GameControllerManager.shared
     @State private var focusedClient: GameClient?
-    /// 0: Featured Hero Banner, 1: Bundled Games, 2: Custom Games, 3: Pack Retro Game
+    /// 0: Featured Hero Banner, 1...shelves.count: Shelf sections, shelves.count + 1: Pack Retro Game
     @State private var focusedSection: Int = 0
     @State private var focusedIndex: Int = 0
     @State private var focusedID: String = "hero-banner"
 
+    private var effectiveShelfCount: Int {
+        shelves.isEmpty ? 1 : shelves.count
+    }
+
+    private var navigation: LibraryNavigationModel {
+        LibraryNavigationModel(shelfCount: effectiveShelfCount)
+    }
+
     private var allClients: [GameClient] {
-        bundledClients + customClients
+        var seen: Set<String> = []
+        return shelves.flatMap(\.clients).filter { seen.insert($0.id).inserted }
     }
 
     private var activeHeroClient: GameClient {
-        focusedClient ?? bundledClients.first ?? customClients.first ?? GameClient.bundled[0]
+        if let focusedClient, allClients.contains(where: { $0.id == focusedClient.id }) {
+            return focusedClient
+        }
+        return allClients.first ?? GameClient.bundled[0]
+    }
+
+    private var addClientShelfID: String? {
+        if shelves.contains(where: { $0.kind == .type(.web) }) {
+            return shelves.first(where: { $0.kind == .type(.web) })?.id
+        }
+        return shelves.first?.id
     }
 
     var body: some View {
@@ -38,7 +56,6 @@ struct LibraryView: View {
             ScrollViewReader { verticalProxy in
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(alignment: .leading, spacing: verticalSizeClass == .compact ? 14 : 22) {
-                        // Featured Hero Banner (Section 0)
                         HeroHeaderView(
                             client: activeHeroClient,
                             coverImage: coverImage(activeHeroClient),
@@ -58,79 +75,28 @@ struct LibraryView: View {
                             reVCDOSMenuItems(activeHeroClient)
                         }
 
-                        // Bundled Games Shelf (Section 1)
-                        shelfView(
-                            title: "Bundled Games",
-                            count: bundledClients.count,
-                            clients: bundledClients,
-                            sectionIndex: 1
-                        )
-                        .id("shelf-bundled")
-
-                        // Custom Games Shelf (Section 2)
-                        shelfView(
-                            title: "Custom Games",
-                            count: customClients.count,
-                            clients: customClients,
-                            sectionIndex: 2,
-                            showAddCard: true
-                        )
-                        .id("shelf-custom")
-
-                        // Retro Game Packer Banner (Section 3)
-                        Button(action: onOpenPacker) {
-                            HStack(spacing: 14) {
-                                Image(systemName: "shippingbox.fill")
-                                    .font(.title2)
-                                    .foregroundStyle(settings.appTheme.primaryText)
-                                    .frame(width: 44, height: 44)
-                                    .background(settings.appTheme.subtleFill)
-                                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-
-                                VStack(alignment: .leading, spacing: 2) {
-                                    HStack {
-                                        Text("Pack a Retro Game")
-                                            .font(.subheadline.bold())
-                                            .foregroundStyle(settings.appTheme.primaryText)
-                                        Spacer()
-                                        if controllerManager.isConnected {
-                                            Text("RB")
-                                                .font(.system(size: 10, weight: .heavy, design: .rounded))
-                                                .padding(.horizontal, 6)
-                                                .padding(.vertical, 2)
-                                                .background(settings.appTheme.subtleFill)
-                                                .clipShape(Capsule())
-                                                .foregroundStyle(settings.appTheme.primaryText)
-                                        }
-                                    }
-                                    Text("Convert a ROM you own into a portable web game")
-                                        .font(.caption)
-                                        .foregroundStyle(settings.appTheme.secondaryText)
-                                }
-                            }
-                            .padding(14)
-                            .background(settings.appTheme.primaryText.opacity(focusedSection == 3 ? 0.12 : 0.05))
-                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .strokeBorder(
-                                        focusedSection == 3 ? settings.appTheme.primaryText : settings.appTheme.border,
-                                        lineWidth: focusedSection == 3 ? 2.5 : 1
-                                    )
+                        ForEach(Array(shelves.enumerated()), id: \.element.id) { index, shelf in
+                            let sectionIndex = navigation.section(forShelfIndex: index) ?? (index + 1)
+                            shelfView(
+                                shelf: shelf,
+                                sectionIndex: sectionIndex,
+                                showAddCard: shelf.id == addClientShelfID
                             )
-                            .scaleEffect(focusedSection == 3 ? 1.02 : 1.0)
-                            .shadow(
-                                color: focusedSection == 3 ? settings.appTheme.primaryText.opacity(0.18) : Color.clear,
-                                radius: 8,
-                                y: 3
-                            )
-                            .animation(.spring(response: 0.25, dampingFraction: 0.75), value: focusedSection == 3)
+                            .id(verticalScrollID(for: sectionIndex, shelf: shelf))
                         }
-                        .buttonStyle(ScaleButtonStyle())
-                        .padding(.horizontal, 18)
-                        .id("shelf-packer")
 
-                        // Controller Button Legend & Guidance
+                        if shelves.isEmpty {
+                            shelfView(
+                                shelf: LibraryShelf(kind: .type(.web), title: "Library", clients: [], id: "empty-library"),
+                                sectionIndex: 1,
+                                showAddCard: true
+                            )
+                            .id("shelf-empty-library")
+                        }
+
+                        packerBanner
+                            .id("shelf-packer")
+
                         VStack(spacing: 6) {
                             if controllerManager.isConnected {
                                 HStack(spacing: 14) {
@@ -161,22 +127,22 @@ struct LibraryView: View {
                     }
                 }
                 .background(settings.backgroundColor.ignoresSafeArea())
-                // Smoothly center the active section vertically when focus moves
                 .onChange(of: focusedSection) { _, newSection in
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        switch newSection {
-                        case 0:
+                        if newSection == 0 {
                             verticalProxy.scrollTo("hero-banner-container", anchor: .top)
-                        case 1:
-                            verticalProxy.scrollTo("shelf-bundled", anchor: .center)
-                        case 2:
-                            verticalProxy.scrollTo("shelf-custom", anchor: .center)
-                        case 3:
+                        } else if newSection == navigation.packerSection {
                             verticalProxy.scrollTo("shelf-packer", anchor: .center)
-                        default:
-                            break
+                        } else if let shelfIndex = navigation.shelfIndex(forSection: newSection),
+                                  shelves.indices.contains(shelfIndex) {
+                            verticalProxy.scrollTo(verticalScrollID(for: newSection, shelf: shelves[shelfIndex]), anchor: .center)
+                        } else if shelves.isEmpty && newSection == 1 {
+                            verticalProxy.scrollTo("shelf-empty-library", anchor: .center)
                         }
                     }
+                }
+                .onChange(of: shelves.map(\.id)) { _, _ in
+                    clampFocusToAvailableContent()
                 }
             }
             .navigationTitle("Falcon")
@@ -216,26 +182,77 @@ struct LibraryView: View {
             .toolbarBackground(.visible, for: .navigationBar)
         }
         .onAppear {
+            clampFocusToAvailableContent()
             setupControllerCallbacks()
         }
     }
 
+    private var packerBanner: some View {
+        Button(action: onOpenPacker) {
+            HStack(spacing: 14) {
+                Image(systemName: "shippingbox.fill")
+                    .font(.title2)
+                    .foregroundStyle(settings.appTheme.primaryText)
+                    .frame(width: 44, height: 44)
+                    .background(settings.appTheme.subtleFill)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack {
+                        Text("Pack a Retro Game")
+                            .font(.subheadline.bold())
+                            .foregroundStyle(settings.appTheme.primaryText)
+                        Spacer()
+                        if controllerManager.isConnected {
+                            Text("RB")
+                                .font(.system(size: 10, weight: .heavy, design: .rounded))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(settings.appTheme.subtleFill)
+                                .clipShape(Capsule())
+                                .foregroundStyle(settings.appTheme.primaryText)
+                        }
+                    }
+                    Text("Convert a ROM you own into a portable web game")
+                        .font(.caption)
+                        .foregroundStyle(settings.appTheme.secondaryText)
+                }
+            }
+            .padding(14)
+            .background(settings.appTheme.primaryText.opacity(focusedSection == navigation.packerSection ? 0.12 : 0.05))
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(
+                        focusedSection == navigation.packerSection ? settings.appTheme.primaryText : settings.appTheme.border,
+                        lineWidth: focusedSection == navigation.packerSection ? 2.5 : 1
+                    )
+            )
+            .scaleEffect(focusedSection == navigation.packerSection ? 1.02 : 1.0)
+            .shadow(
+                color: focusedSection == navigation.packerSection ? settings.appTheme.primaryText.opacity(0.18) : Color.clear,
+                radius: 8,
+                y: 3
+            )
+            .animation(.spring(response: 0.25, dampingFraction: 0.75), value: focusedSection == navigation.packerSection)
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .padding(.horizontal, 18)
+    }
+
     @ViewBuilder
     private func shelfView(
-        title: String,
-        count: Int,
-        clients: [GameClient],
+        shelf: LibraryShelf,
         sectionIndex: Int,
-        showAddCard: Bool = false
+        showAddCard: Bool
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            // Shelf Header
             HStack(spacing: 8) {
-                Text(title)
+                Text(shelf.title)
                     .font(.title3.weight(.bold))
                     .foregroundStyle(settings.appTheme.primaryText)
 
-                Text("\(count)")
+                Text("\(shelf.clients.count)")
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(settings.appTheme.secondaryText)
                     .padding(.horizontal, 7)
@@ -245,7 +262,7 @@ struct LibraryView: View {
 
                 Spacer()
 
-                if showAddCard && !clients.isEmpty {
+                if showAddCard && !shelf.clients.isEmpty {
                     Button(action: onAddClient) {
                         Image(systemName: "plus.circle")
                             .font(.subheadline)
@@ -255,11 +272,10 @@ struct LibraryView: View {
             }
             .padding(.horizontal, 18)
 
-            // Horizontal Shelf with its own ScrollViewReader to follow the cursor horizontally
             ScrollViewReader { shelfProxy in
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 14) {
-                        ForEach(Array(clients.enumerated()), id: \.element.id) { index, client in
+                        ForEach(Array(shelf.clients.enumerated()), id: \.element.id) { index, client in
                             let isCardFocused = (focusedSection == sectionIndex && focusedID == client.id)
                             GameCard(
                                 client: client,
@@ -300,16 +316,15 @@ struct LibraryView: View {
 
                         if showAddCard {
                             AddClientCard(
-                                isFocused: (focusedSection == 2 && focusedID == "add-custom-client"),
+                                isFocused: (focusedSection == sectionIndex && focusedID == addClientFocusID),
                                 action: onAddClient
                             )
-                            .id("add-custom-client")
+                            .id(addClientFocusID)
                         }
                     }
                     .padding(.horizontal, 18)
                     .padding(.vertical, 6)
                 }
-                // Automatically scroll horizontal shelf to center the selected card
                 .onChange(of: focusedID) { _, newID in
                     if sectionIndex == focusedSection && !newID.isEmpty {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
@@ -363,24 +378,41 @@ struct LibraryView: View {
         }
     }
 
+    private var addClientFocusID: String { "add-custom-client" }
+
+    private func verticalScrollID(for sectionIndex: Int, shelf: LibraryShelf) -> String {
+        "shelf-\(shelf.id)"
+    }
+
+    private func shelf(forSection section: Int) -> LibraryShelf? {
+        guard !shelves.isEmpty,
+              let shelfIndex = navigation.shelfIndex(forSection: section),
+              shelves.indices.contains(shelfIndex) else { return nil }
+        return shelves[shelfIndex]
+    }
+
+    private func showsAddCard(for section: Int) -> Bool {
+        if shelves.isEmpty { return section == 1 }
+        guard let shelf = shelf(forSection: section) else { return false }
+        return shelf.id == addClientShelfID
+    }
+
     private func totalItems(in section: Int) -> Int {
-        switch section {
-        case 0:
+        if section == 0 {
             return allClients.count
-        case 1:
-            return bundledClients.count
-        case 2:
-            return customClients.count + 1
-        case 3:
-            return 1
-        default:
-            return 0
         }
+        if section == navigation.packerSection {
+            return 1
+        }
+        if shelves.isEmpty {
+            return section == 1 ? 1 : 0
+        }
+        guard let shelf = shelf(forSection: section) else { return 0 }
+        return shelf.clients.count + (showsAddCard(for: section) ? 1 : 0)
     }
 
     private func navigateHorizontally(step: Int) {
         if focusedSection == 0 {
-            // Cycling through featured games on the Top Banner
             guard !allClients.isEmpty else { return }
             let count = allClients.count
             let newIndex = max(0, min(count - 1, focusedIndex + step))
@@ -391,7 +423,7 @@ struct LibraryView: View {
                     focusedClient = target
                 }
             }
-        } else if focusedSection == 1 || focusedSection == 2 {
+        } else if navigation.isShelfSection(focusedSection) || (shelves.isEmpty && focusedSection == 1) {
             let count = totalItems(in: focusedSection)
             guard count > 0 else { return }
 
@@ -404,7 +436,7 @@ struct LibraryView: View {
     }
 
     private func navigateVertically(step: Int) {
-        let newSection = max(0, min(3, focusedSection + step))
+        let newSection = navigation.clampedSection(focusedSection + step)
         if newSection != focusedSection {
             focusedSection = newSection
             let count = totalItems(in: focusedSection)
@@ -413,57 +445,84 @@ struct LibraryView: View {
         }
     }
 
+    private func clampFocusToAvailableContent() {
+        let maxSection = shelves.isEmpty ? 2 : navigation.maxSection
+        if focusedSection > maxSection {
+            focusedSection = maxSection
+        }
+        let count = totalItems(in: focusedSection)
+        if count == 0 {
+            if focusedSection != 0 && focusedSection != navigation.packerSection {
+                focusedIndex = 0
+                updateFocusedItem()
+            }
+            return
+        }
+        focusedIndex = max(0, min(focusedIndex, count - 1))
+        if focusedSection == 0, let focusedClient, !allClients.contains(where: { $0.id == focusedClient.id }) {
+            self.focusedClient = allClients.first
+        }
+        updateFocusedItem()
+    }
+
     private func updateFocusedItem() {
-        switch focusedSection {
-        case 0:
+        if focusedSection == 0 {
             focusedID = "hero-banner"
-            if focusedClient == nil {
+            if focusedClient == nil || !allClients.contains(where: { $0.id == focusedClient!.id }) {
                 focusedClient = allClients.first
             }
+            return
+        }
 
-        case 1:
-            guard !bundledClients.isEmpty else { return }
-            let client = bundledClients[min(focusedIndex, bundledClients.count - 1)]
+        if focusedSection == navigation.packerSection {
+            focusedID = "packer-button"
+            return
+        }
+
+        if shelves.isEmpty {
+            if focusedSection == 1 {
+                focusedID = addClientFocusID
+            }
+            return
+        }
+
+        guard let shelf = shelf(forSection: focusedSection) else { return }
+        let addCardVisible = showsAddCard(for: focusedSection)
+        if focusedIndex < shelf.clients.count {
+            let client = shelf.clients[focusedIndex]
             focusedClient = client
             focusedID = client.id
-
-        case 2:
-            if focusedIndex < customClients.count {
-                let client = customClients[focusedIndex]
-                focusedClient = client
-                focusedID = client.id
-            } else {
-                focusedID = "add-custom-client"
-            }
-
-        case 3:
-            focusedID = "packer-button"
-
-        default:
-            break
+        } else if addCardVisible {
+            focusedID = addClientFocusID
+        } else if let last = shelf.clients.last {
+            focusedIndex = shelf.clients.count - 1
+            focusedClient = last
+            focusedID = last.id
+        } else {
+            focusedID = addClientFocusID
         }
     }
 
     private func handleActionA() {
-        switch focusedSection {
-        case 0:
+        if focusedSection == 0 {
             if activeHeroClient.url != nil {
                 onSelect(activeHeroClient)
             }
-        case 1:
-            if let focusedClient, focusedClient.url != nil {
-                onSelect(focusedClient)
-            }
-        case 2:
-            if focusedID == "add-custom-client" {
-                onAddClient()
-            } else if let focusedClient, focusedClient.url != nil {
-                onSelect(focusedClient)
-            }
-        case 3:
+            return
+        }
+
+        if focusedSection == navigation.packerSection {
             onOpenPacker()
-        default:
-            break
+            return
+        }
+
+        if focusedID == addClientFocusID {
+            onAddClient()
+            return
+        }
+
+        if let focusedClient, focusedClient.url != nil, allClients.contains(where: { $0.id == focusedClient.id }) || shelf(forSection: focusedSection)?.clients.contains(where: { $0.id == focusedClient.id }) == true {
+            onSelect(focusedClient)
         }
     }
 }

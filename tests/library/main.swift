@@ -14,6 +14,7 @@ func runTests() throws {
     try testShelvesBuildRecentlyPlayedAndTypeShelves()
     try testRecentlyPlayedIsCappedAndStillAppearsInTypeShelf()
     try testTypeShelvesAreOrderedAndSortedByRecentThenName()
+    try testLibraryNavigationModelMapsDynamicSectionsWithPackerLast()
     print("ALL TESTS PASSED")
 }
 
