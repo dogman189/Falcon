@@ -381,6 +381,7 @@ struct LibraryView: View {
             handleActionA()
         }
 
+        controllerManager.onActionB = nil
         controllerManager.onActionX = {
             onAddClient()
         }

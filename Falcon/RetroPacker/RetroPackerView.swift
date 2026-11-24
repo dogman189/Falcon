@@ -425,22 +425,24 @@ struct RetroPackerView: View {
         }
     }
 
-    @ViewBuilder
     private func rowBackground(for fieldIndex: Int, isPrimaryButton: Bool = false) -> some View {
         let isFocused = (focusedField == fieldIndex && controllerManager.isConnected)
         let base = settings.appTheme.primaryText
-        ZStack {
-            if isPrimaryButton {
-                isFocused ? base.opacity(0.25) : base.opacity(0.1)
-            } else {
-                isFocused ? base.opacity(0.12) : settings.appTheme.subtleFill
-            }
-
-            if isFocused {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(base, lineWidth: 2)
-            }
+        let fill: Color
+        if isPrimaryButton {
+            fill = isFocused ? base.opacity(0.25) : base.opacity(0.1)
+        } else {
+            fill = isFocused ? base.opacity(0.12) : settings.appTheme.subtleFill
         }
+
+        return Rectangle()
+            .fill(fill)
+            .overlay {
+                if isFocused {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(base, lineWidth: 2)
+                }
+            }
     }
 
     private func buttonLegendItem(button: String, label: String) -> some View {
@@ -483,6 +485,7 @@ struct RetroPackerView: View {
         controllerManager.onActionB = {
             handleActionB()
         }
+        controllerManager.onActionX = nil
     }
 
     private func navigateVertically(step: Int) {

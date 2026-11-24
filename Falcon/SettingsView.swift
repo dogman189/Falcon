@@ -231,6 +231,7 @@ struct SettingsView: View {
         controllerManager.onActionB = {
             handleActionB()
         }
+        controllerManager.onActionX = nil
     }
 
     private func navigateVertically(step: Int) {
