@@ -453,8 +453,10 @@ struct LibraryView: View {
         let count = totalItems(in: focusedSection)
         if count == 0 {
             if focusedSection != 0 && focusedSection != navigation.packerSection {
+                focusedSection = navigation.packerSection
                 focusedIndex = 0
                 updateFocusedItem()
+                return
             }
             return
         }
