@@ -380,16 +380,23 @@ struct ContentView: View {
         )
     }
 
+    private var orderedTabs: [AppTab] { [.library, .packer, .settings] }
+
     private func setupControllerTabSwitching() {
         GameControllerManager.shared.onShoulderLeft = {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                selectedTab = .library
-            }
+            cycleTab(step: -1)
         }
         GameControllerManager.shared.onShoulderRight = {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                selectedTab = .packer
-            }
+            cycleTab(step: 1)
+        }
+    }
+
+    private func cycleTab(step: Int) {
+        let tabs = orderedTabs
+        guard let index = tabs.firstIndex(of: selectedTab) else { return }
+        let next = (index + step + tabs.count) % tabs.count
+        withAnimation(.easeInOut(duration: 0.2)) {
+            selectedTab = tabs[next]
         }
     }
 
