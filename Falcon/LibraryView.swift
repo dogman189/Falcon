@@ -14,6 +14,7 @@ struct LibraryView: View {
     let onAddClient: () -> Void
     let onRemoveClient: (GameClient) -> Void
     let onOpenPacker: () -> Void
+    let onSearchCoverOnline: (GameClient) -> Void
     @ViewBuilder let coverMenuItems: (GameClient) -> AnyView
     @ViewBuilder let reVCDOSMenuItems: (GameClient) -> AnyView
     var isActiveTab: Bool = true
@@ -72,6 +73,11 @@ struct LibraryView: View {
                             onSelect(activeHeroClient)
                         }
                         .contextMenu {
+                            Button {
+                                onSearchCoverOnline(activeHeroClient)
+                            } label: {
+                                Label("Search Cover Online...", systemImage: "globe")
+                            }
                             coverMenuItems(activeHeroClient)
                             reVCDOSMenuItems(activeHeroClient)
                         }
@@ -309,6 +315,11 @@ struct LibraryView: View {
                                     Label("Set as Featured", systemImage: "star")
                                 }
 
+                                Button {
+                                    onSearchCoverOnline(client)
+                                } label: {
+                                    Label("Search Cover Online...", systemImage: "globe")
+                                }
                                 coverMenuItems(client)
                                 reVCDOSMenuItems(client)
 

@@ -36,6 +36,7 @@ struct ContentView: View {
     @State private var showingCoverFileImporter = false
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var coverRevision = 0
+    @State private var coverSearchClient: GameClient?
     @State private var autoCoverFetchIDs: Set<String> = []
     private let coverService = WikipediaCoverService()
     @State private var reVCDOSServer: ReVCDOSLocalServer?
@@ -242,6 +243,13 @@ struct ContentView: View {
             .frame(minWidth: 420)
             .interactiveDismissDisabled(true)
         }
+        .sheet(item: $coverSearchClient) { client in
+            CoverSearchSheet(client: client, service: coverService) { candidate in
+                Task {
+                    await applyOnlineCover(candidate, for: client)
+                }
+            }
+        }
     }
 
     private var quitButton: some View {
@@ -380,6 +388,9 @@ struct ContentView: View {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     selectedTab = .packer
                 }
+            },
+            onSearchCoverOnline: { client in
+                coverSearchClient = client
             },
             coverMenuItems: { client in
                 AnyView(coverMenuItems(for: client))
@@ -713,6 +724,19 @@ struct ContentView: View {
         await MainActor.run {
             try? ClientCoverStore.shared.save(image: image, for: target.id)
             coverRevision += 1
+        }
+    }
+
+    @MainActor
+    private func applyOnlineCover(_ candidate: WikipediaCoverCandidate, for client: GameClient) async {
+        coverSearchClient = nil
+        do {
+            let data = try await coverService.downloadImageData(from: candidate.thumbnailURL)
+            let ext = candidate.thumbnailURL.pathExtension.isEmpty ? "jpg" : candidate.thumbnailURL.pathExtension
+            try ClientCoverStore.shared.saveManual(data: data, fileExtension: ext, for: client.id)
+            coverRevision += 1
+        } catch {
+            // Network failures are non-fatal; keep built-in/default/current cover.
         }
     }
 }
