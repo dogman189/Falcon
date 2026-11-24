@@ -17,6 +17,14 @@ struct GameClient: Identifiable, Hashable {
         return false
     }
 
+    var coverSearchName: String {
+        switch id {
+        case "bundled:1.8.8-wasm": return "Minecraft Java Edition"
+        case "bundled:reVCDOS": return "Grand Theft Auto: Vice City"
+        default: return name.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+    }
+
     var defaultCoverImageName: String {
         switch source {
         case let .bundled(resource, _, _, _):

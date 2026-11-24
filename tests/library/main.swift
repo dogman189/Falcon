@@ -25,6 +25,11 @@ func runTests() throws {
     try testLegacyRootCoverIsTreatedAsManual()
     try testResetManualCoverKeepsAuto()
     try testRemoveAllCoversDeletesManualAndAuto()
+
+    try testBundledCoverSearchNamesAreCurated()
+    try testCustomCoverSearchNameFallsBackToTrimmedName()
+    try testWikipediaParseSearchResultsReturnsThumbnailCandidates()
+    try testWikipediaBestCandidatePrefersFirstThumbnailResult()
     print("ALL TESTS PASSED")
 }
 
