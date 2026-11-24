@@ -41,6 +41,7 @@ func runTests() {
         try testImportGeneratedClientSanitizesNameForFileName()
         try testImportGeneratedClientAvoidsDoubleHtmlExtension()
         try testFileImportStillWorksWithInjectedDirectory()
+        try testImportGeneratedClientPersistsSystemIDMetadata()
     } catch {
         fatalError("custom client store test failed: \(error)")
     }

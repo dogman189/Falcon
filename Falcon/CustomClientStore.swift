@@ -118,7 +118,12 @@ final class CustomClientStore {
     ///
     /// The file is written into the same `CustomClients` directory used by file imports
     /// so it shows up in the client list and can be removed like any other custom client.
-    func importGeneratedClient(named name: String, htmlData: Data) throws -> GameClient {
+    func importGeneratedClient(
+        named name: String,
+        htmlData: Data,
+        systemID: String? = nil,
+        metadataStore: ClientLibraryMetadataStore = .shared
+    ) throws -> GameClient {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let displayName = trimmedName.isEmpty ? "Custom Client" : trimmedName
 
@@ -141,6 +146,10 @@ final class CustomClientStore {
             throw CustomClientStoreError.writeFailed
         }
 
+        if let systemID, !systemID.isEmpty {
+            metadataStore.setSystemID(systemID, for: id)
+        }
+
         return GameClient(
             id: id,
             name: displayName,
@@ -160,6 +169,7 @@ final class CustomClientStore {
         records.removeAll { $0.id == client.id }
         try? saveRecords(records)
         ClientCoverStore.shared.reset(for: client.id)
+        ClientLibraryMetadataStore.shared.remove(clientID: client.id)
     }
 
     private func ensureBaseDirectory() throws {

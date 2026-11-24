@@ -46,7 +46,11 @@ final class RetroPackerModel {
                 guard let self else { return }
                 let name = self.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? fileName : self.title
                 do {
-                    let client = try CustomClientStore.shared.importGeneratedClient(named: name, htmlData: htmlData)
+                    let client = try CustomClientStore.shared.importGeneratedClient(
+                        named: name,
+                        htmlData: htmlData,
+                        systemID: self.selectedSystem?.id
+                    )
                     self.isPacking = false
                     self.progress = 0
                     self.statusMessage = ""

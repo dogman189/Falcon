@@ -1,10 +1,5 @@
 import Foundation
 
-// The shared ReVCDOS test stub only covers cover lookup; `remove(_:)` also resets covers.
-extension ClientCoverStore {
-    func reset(for clientID: String) {}
-}
-
 private func makeTemporaryStoreRoot() throws -> URL {
     let fileManager = FileManager.default
     let root = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -110,4 +105,21 @@ func testFileImportStillWorksWithInjectedDirectory() throws {
     let savedHTML = try Data(contentsOf: fileURL)
     assert(savedHTML == Data("<html>Tetris</html>".utf8))
     assert(store.load().contains(where: { $0.id == client.id }))
+}
+
+func testImportGeneratedClientPersistsSystemIDMetadata() throws {
+    let fileManager = FileManager.default
+    let root = try makeTemporaryStoreRoot()
+    defer { try? fileManager.removeItem(at: root) }
+    let store = CustomClientStore(baseDirectoryURL: root.appendingPathComponent("Clients", isDirectory: true))
+    let metadataStore = ClientLibraryMetadataStore(baseDirectoryURL: root.appendingPathComponent("Metadata", isDirectory: true))
+
+    let client = try store.importGeneratedClient(
+        named: "Pokemon",
+        htmlData: Data("<html></html>".utf8),
+        systemID: "gba",
+        metadataStore: metadataStore
+    )
+
+    assert(metadataStore.metadata(for: client.id).systemID == "gba")
 }
