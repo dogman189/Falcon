@@ -13,8 +13,10 @@ struct ContentView: View {
     private enum AppTab: Hashable {
         case library
         case packer
+        case settings
     }
 
+    @EnvironmentObject private var settings: AppSettings
     @State private var selectedClient: GameClient?
     @State private var quitRevealed = false
     @State private var quitHideTask: Task<Void, Never>?
@@ -45,6 +47,7 @@ struct ContentView: View {
         Group {
             if let clientFailure {
                 failureView(title: selectedClient?.name ?? "Client", message: clientFailure)
+                    .appChromeScale(settings.uiScale)
             } else if let selectedClient, !showingAssetDownload {
                 if let clientURL = selectedClient.url {
                     let webContent: FalconWebContent = {
@@ -53,12 +56,17 @@ struct ContentView: View {
                         }
                         return .file(clientURL)
                     }()
-                    EaglerWebView(content: webContent, snapshotter: snapshotter) { message in
+                    EaglerWebView(
+                        content: webContent,
+                        snapshotter: snapshotter,
+                        webScale: settings.webScale,
+                        backgroundUIColor: settings.backgroundUIColor
+                    ) { message in
                         clientFailure = message
                     }
                     .id(webViewIdentity)
                     .ignoresSafeArea()
-                    .background(Color.appBackground)
+                    .background(settings.backgroundColor)
                     .overlay(alignment: .topLeading) {
                         ZStack(alignment: .topLeading) {
                             Color.clear
@@ -108,10 +116,17 @@ struct ContentView: View {
                     .tabItem {
                         Label("Packer", systemImage: "shippingbox")
                     }
+
+                    SettingsView()
+                        .tag(AppTab.settings)
+                        .tabItem {
+                            Label("Settings", systemImage: "gearshape")
+                        }
                 }
                 .tint(.white)
-                .toolbarBackground(Color.appBackground, for: .tabBar)
+                .toolbarBackground(settings.backgroundColor, for: .tabBar)
                 .toolbarBackground(.visible, for: .tabBar)
+                .appChromeScale(settings.uiScale)
             }
         }
         .preferredColorScheme(.dark)
@@ -284,7 +299,7 @@ struct ContentView: View {
         }
         .padding(32)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.appBackground)
+        .background(settings.backgroundColor)
         .foregroundStyle(.white)
         .ignoresSafeArea()
     }

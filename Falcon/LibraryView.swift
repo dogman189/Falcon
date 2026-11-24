@@ -5,6 +5,7 @@ import SwiftUI
 /// horizontal browsing shelves, and a dedicated controller shortcut to the Retro Packer.
 struct LibraryView: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @EnvironmentObject private var settings: AppSettings
 
     let bundledClients: [GameClient]
     let customClients: [GameClient]
@@ -159,7 +160,7 @@ struct LibraryView: View {
                         .padding(.bottom, 24)
                     }
                 }
-                .background(Color.appBackground.ignoresSafeArea())
+                .background(settings.backgroundColor.ignoresSafeArea())
                 // Smoothly center the active section vertically when focus moves
                 .onChange(of: focusedSection) { _, newSection in
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
@@ -211,7 +212,7 @@ struct LibraryView: View {
                     .accessibilityLabel("Add Client from Files")
                 }
             }
-            .toolbarBackground(Color.appBackground, for: .navigationBar)
+            .toolbarBackground(settings.backgroundColor, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
         }
         .onAppear {

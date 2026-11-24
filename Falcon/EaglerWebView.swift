@@ -24,6 +24,8 @@ enum FalconWebContent {
 struct EaglerWebView: UIViewRepresentable {
     let content: FalconWebContent
     var snapshotter: WebViewSnapshotter?
+    var webScale: Double = 1.0
+    var backgroundUIColor: UIColor = UIColor(red: 11 / 255, green: 20 / 255, blue: 38 / 255, alpha: 1)
     var onFailure: (String) -> Void
 
     func makeCoordinator() -> Coordinator {
@@ -39,9 +41,8 @@ struct EaglerWebView: UIViewRepresentable {
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
         webView.isOpaque = true
-        let darkBlue = UIColor(red: 11 / 255, green: 20 / 255, blue: 38 / 255, alpha: 1)
-        webView.backgroundColor = darkBlue
-        webView.scrollView.backgroundColor = darkBlue
+        webView.backgroundColor = backgroundUIColor
+        webView.scrollView.backgroundColor = backgroundUIColor
         webView.scrollView.isScrollEnabled = false
         webView.scrollView.bounces = false
         webView.scrollView.bouncesZoom = false
@@ -56,12 +57,29 @@ struct EaglerWebView: UIViewRepresentable {
         #endif
 
         snapshotter?.webView = webView
+        webView.pageZoom = webScale
         loadContent(in: webView)
         return webView
     }
 
     func updateUIView(_ uiView: WKWebView, context: Context) {
         snapshotter?.webView = uiView
+        if uiView.pageZoom != webScale {
+            uiView.pageZoom = webScale
+        }
+        if uiView.backgroundColor != backgroundUIColor {
+            uiView.backgroundColor = backgroundUIColor
+            uiView.scrollView.backgroundColor = backgroundUIColor
+        }
+    }
+
+    private static func hexString(for color: UIColor) -> String {
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 0
+        color.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        return String(format: "#%02X%02X%02X", Int(red * 255), Int(green * 255), Int(blue * 255))
     }
 
     private func loadContent(in webView: WKWebView) {
@@ -69,7 +87,8 @@ struct EaglerWebView: UIViewRepresentable {
         case let .file(fileURL):
             guard FileManager.default.fileExists(atPath: fileURL.path) else {
                 assertionFailure("Missing bundled resource: \(fileURL.lastPathComponent)")
-                let message = "<html><body style='background:#0B1426;color:#fff;font-family:-apple-system'>Missing bundled client: \(fileURL.lastPathComponent)</body></html>"
+                let hex = Self.hexString(for: backgroundUIColor)
+                let message = "<html><body style='background:\(hex);color:#fff;font-family:-apple-system'>Missing bundled client: \(fileURL.lastPathComponent)</body></html>"
                 webView.loadHTMLString(message, baseURL: nil)
                 return
             }

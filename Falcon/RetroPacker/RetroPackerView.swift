@@ -158,6 +158,7 @@ struct RetroPackerView: View {
     var onReturnToLibrary: (() -> Void)? = nil
     let onCancel: (() -> Void)?
 
+    @EnvironmentObject private var settings: AppSettings
     @ObservedObject private var controllerManager = GameControllerManager.shared
     /// 0: ROM File, 1: System Picker, 2: Game Title TextField, 3: Pack / Cancel Button
     @State private var focusedField: Int = 0
@@ -332,9 +333,9 @@ struct RetroPackerView: View {
                 }
             }
             .scrollContentBackground(.hidden)
-            .background(Color.appBackground)
+            .background(settings.backgroundColor)
             .navigationTitle("Pack a Game")
-            .toolbarBackground(Color.appBackground, for: .navigationBar)
+            .toolbarBackground(settings.backgroundColor, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
