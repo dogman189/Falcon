@@ -1,55 +1,166 @@
 import Foundation
+#if canImport(UIKit)
 import UIKit
+#endif
 
 final class ClientCoverStore {
     static let shared = ClientCoverStore()
 
-    private let fileManager = FileManager.default
+    private let fileManager: FileManager
+    private let configuredBaseDirectoryURL: URL?
+
+    init(fileManager: FileManager = .default, baseDirectoryURL: URL? = nil) {
+        self.fileManager = fileManager
+        self.configuredBaseDirectoryURL = baseDirectoryURL
+    }
 
     private var baseDirectoryURL: URL? {
+        if let configuredBaseDirectoryURL { return configuredBaseDirectoryURL }
         guard let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
             return nil
         }
         return appSupport.appendingPathComponent("Covers", isDirectory: true)
     }
 
+    private var manualDirectoryURL: URL? {
+        baseDirectoryURL?.appendingPathComponent("manual", isDirectory: true)
+    }
+
+    private var autoDirectoryURL: URL? {
+        baseDirectoryURL?.appendingPathComponent("auto", isDirectory: true)
+    }
+
+    func manualCoverURL(for clientID: String) -> URL? {
+        if let url = fileURL(for: clientID, in: manualDirectoryURL) {
+            return url
+        }
+        return legacyCoverURL(for: clientID)
+    }
+
+    func autoCoverURL(for clientID: String) -> URL? {
+        fileURL(for: clientID, in: autoDirectoryURL)
+    }
+
     func coverURL(for clientID: String) -> URL? {
-        guard let baseDirectoryURL else { return nil }
-        guard let files = try? fileManager.contentsOfDirectory(at: baseDirectoryURL, includingPropertiesForKeys: nil) else {
+        manualCoverURL(for: clientID) ?? autoCoverURL(for: clientID)
+    }
+
+    func hasManualCover(for clientID: String) -> Bool {
+        manualCoverURL(for: clientID) != nil
+    }
+
+    func saveManual(data: Data, fileExtension: String, for clientID: String) throws {
+        try ensureDirectory(manualDirectoryURL)
+        removeManualFiles(for: clientID)
+        try write(data: data, fileExtension: fileExtension, for: clientID, in: manualDirectoryURL)
+    }
+
+    func importManualCover(from sourceURL: URL, for clientID: String) throws {
+        let accessed = sourceURL.startAccessingSecurityScopedResource()
+        defer {
+            if accessed { sourceURL.stopAccessingSecurityScopedResource() }
+        }
+        let data = try Data(contentsOf: sourceURL)
+        let ext = normalizedFileExtension(sourceURL.pathExtension)
+        #if canImport(UIKit)
+        guard let image = UIImage(data: data) else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        if ext == "png", let png = image.pngData() {
+            try saveManual(data: png, fileExtension: "png", for: clientID)
+        } else if let jpg = image.jpegData(compressionQuality: 0.85) {
+            try saveManual(data: jpg, fileExtension: "jpg", for: clientID)
+        } else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+        #else
+        guard !data.isEmpty else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        let fileExtension = ext.isEmpty ? "jpg" : ext
+        try saveManual(data: data, fileExtension: fileExtension, for: clientID)
+        #endif
+    }
+
+    func saveAuto(data: Data, fileExtension: String, for clientID: String) throws {
+        try ensureDirectory(autoDirectoryURL)
+        removeFiles(for: clientID, in: autoDirectoryURL)
+        try write(data: data, fileExtension: fileExtension, for: clientID, in: autoDirectoryURL)
+    }
+
+    func resetManualCover(for clientID: String) {
+        removeManualFiles(for: clientID)
+    }
+
+    func removeAllCovers(for clientID: String) {
+        removeManualFiles(for: clientID)
+        removeFiles(for: clientID, in: autoDirectoryURL)
+    }
+
+    #if canImport(UIKit)
+    func saveManual(image: UIImage, for clientID: String) throws {
+        guard let data = image.jpegData(compressionQuality: 0.85) else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+        try saveManual(data: data, fileExtension: "jpg", for: clientID)
+    }
+
+    func saveAuto(image: UIImage, for clientID: String) throws {
+        guard let data = image.jpegData(compressionQuality: 0.85) else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+        try saveAuto(data: data, fileExtension: "jpg", for: clientID)
+    }
+
+    func save(image: UIImage, for clientID: String) throws {
+        try saveManual(image: image, for: clientID)
+    }
+    #endif
+
+    func importCover(from sourceURL: URL, for clientID: String) throws {
+        try importManualCover(from: sourceURL, for: clientID)
+    }
+
+    func reset(for clientID: String) {
+        removeAllCovers(for: clientID)
+    }
+
+    private func write(data: Data, fileExtension: String, for clientID: String, in directoryURL: URL?) throws {
+        guard let directoryURL else { throw CocoaError(.fileNoSuchFile) }
+        let ext = normalizedFileExtension(fileExtension)
+        let safeExt = ext.isEmpty ? "jpg" : ext
+        let url = directoryURL.appendingPathComponent("\(sanitizedFileName(for: clientID)).\(safeExt)")
+        try data.write(to: url, options: .atomic)
+    }
+
+    private func ensureDirectory(_ directoryURL: URL?) throws {
+        guard let directoryURL else { throw CocoaError(.fileNoSuchFile) }
+        if !fileManager.fileExists(atPath: directoryURL.path) {
+            try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        }
+    }
+
+    private func fileURL(for clientID: String, in directoryURL: URL?) -> URL? {
+        guard let directoryURL,
+              let files = try? fileManager.contentsOfDirectory(at: directoryURL, includingPropertiesForKeys: nil) else {
             return nil
         }
         let prefix = sanitizedFileName(for: clientID) + "."
         return files.first(where: { $0.lastPathComponent.hasPrefix(prefix) && fileManager.fileExists(atPath: $0.path) })
     }
 
-    func save(image: UIImage, for clientID: String) throws {
-        guard let data = image.jpegData(compressionQuality: 0.85) else {
-            throw CocoaError(.fileWriteUnknown)
-        }
-        try save(data: data, for: clientID, fileExtension: "jpg")
+    private func legacyCoverURL(for clientID: String) -> URL? {
+        fileURL(for: clientID, in: baseDirectoryURL)
     }
 
-    func importCover(from sourceURL: URL, for clientID: String) throws {
-        try ensureBaseDirectory()
-        let accessed = sourceURL.startAccessingSecurityScopedResource()
-        defer {
-            if accessed { sourceURL.stopAccessingSecurityScopedResource() }
-        }
-        let data = try Data(contentsOf: sourceURL)
-        guard let image = UIImage(data: data) else {
-            throw CocoaError(.fileReadCorruptFile)
-        }
-        let ext = sourceURL.pathExtension.lowercased()
-        if ext == "png", let png = image.pngData() {
-            try save(data: png, for: clientID, fileExtension: "png")
-        } else {
-            try save(image: image, for: clientID)
-        }
+    private func removeManualFiles(for clientID: String) {
+        removeFiles(for: clientID, in: manualDirectoryURL)
+        removeFiles(for: clientID, in: baseDirectoryURL)
     }
 
-    func reset(for clientID: String) {
-        guard let baseDirectoryURL,
-              let files = try? fileManager.contentsOfDirectory(at: baseDirectoryURL, includingPropertiesForKeys: nil) else {
+    private func removeFiles(for clientID: String, in directoryURL: URL?) {
+        guard let directoryURL,
+              let files = try? fileManager.contentsOfDirectory(at: directoryURL, includingPropertiesForKeys: nil) else {
             return
         }
         let prefix = sanitizedFileName(for: clientID) + "."
@@ -58,19 +169,11 @@ final class ClientCoverStore {
         }
     }
 
-    private func save(data: Data, for clientID: String, fileExtension: String) throws {
-        try ensureBaseDirectory()
-        guard let baseDirectoryURL else { throw CocoaError(.fileNoSuchFile) }
-        reset(for: clientID)
-        let url = baseDirectoryURL.appendingPathComponent("\(sanitizedFileName(for: clientID)).\(fileExtension)")
-        try data.write(to: url, options: .atomic)
-    }
-
-    private func ensureBaseDirectory() throws {
-        guard let baseDirectoryURL else { throw CocoaError(.fileNoSuchFile) }
-        if !fileManager.fileExists(atPath: baseDirectoryURL.path) {
-            try fileManager.createDirectory(at: baseDirectoryURL, withIntermediateDirectories: true)
-        }
+    private func normalizedFileExtension(_ ext: String) -> String {
+        let trimmed = ext.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lower = trimmed.lowercased()
+        if lower.hasPrefix(".") { return String(lower.dropFirst()) }
+        return lower
     }
 
     private func sanitizedFileName(for clientID: String) -> String {

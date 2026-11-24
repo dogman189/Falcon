@@ -19,6 +19,12 @@ func runTests() throws {
     try testRecentlyPlayedIsCappedAndStillAppearsInTypeShelf()
     try testTypeShelvesAreOrderedAndSortedByRecentThenName()
     try testLibraryNavigationModelMapsDynamicSectionsWithPackerLast()
+
+    try testCoverStorePrefersManualOverAuto()
+    try testCoverStoreFallsBackToAutoWhenNoManual()
+    try testLegacyRootCoverIsTreatedAsManual()
+    try testResetManualCoverKeepsAuto()
+    try testRemoveAllCoversDeletesManualAndAuto()
     print("ALL TESTS PASSED")
 }
 

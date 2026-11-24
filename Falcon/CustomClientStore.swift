@@ -168,7 +168,7 @@ final class CustomClientStore {
         }
         records.removeAll { $0.id == client.id }
         try? saveRecords(records)
-        ClientCoverStore.shared.reset(for: client.id)
+        ClientCoverStore.shared.removeAllCovers(for: client.id)
         metadataStore.remove(clientID: client.id)
     }
 
