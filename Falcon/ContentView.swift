@@ -19,6 +19,7 @@ struct ContentView: View {
     @EnvironmentObject private var settings: AppSettings
     @State private var selectedClient: GameClient?
     @State private var activeLaunchSession: ActiveLaunchSession?
+    @State private var countedLaunchClientID: String?
     @State private var quitRevealed = false
     @State private var quitHideTask: Task<Void, Never>?
     @State private var clientFailure: String?
@@ -64,6 +65,9 @@ struct ContentView: View {
                         webScale: settings.webScale,
                         backgroundUIColor: settings.backgroundUIColor
                     ) { message in
+                        if clientFailure == nil {
+                            pauseLaunchSession()
+                        }
                         clientFailure = message
                     }
                     .id(webViewIdentity)
@@ -136,6 +140,7 @@ struct ContentView: View {
             hideQuit()
             if newClient == nil {
                 finalizeLaunchSession()
+                countedLaunchClientID = nil
                 reVCDOSServer?.stop()
                 reVCDOSServer = nil
             }
@@ -280,6 +285,26 @@ struct ContentView: View {
             at: Date(),
             store: .shared
         )
+        countedLaunchClientID = clientID
+        libraryRevision += 1
+    }
+
+    private func resumeLaunchSession(for clientID: String) {
+        LaunchSessionTracker.resume(
+            &activeLaunchSession,
+            clientID: clientID,
+            at: Date(),
+            store: .shared
+        )
+        libraryRevision += 1
+    }
+
+    private func pauseLaunchSession() {
+        LaunchSessionTracker.pause(
+            &activeLaunchSession,
+            at: Date(),
+            store: .shared
+        )
         libraryRevision += 1
     }
 
@@ -314,6 +339,7 @@ struct ContentView: View {
 
                 Button("Back to clients") {
                     finalizeLaunchSession()
+                    countedLaunchClientID = nil
                     clientFailure = nil
                     selectedClient = nil
                 }
@@ -407,10 +433,14 @@ struct ContentView: View {
         #endif
     }
 
-    private func selectClient(_ client: GameClient) {
+    private func selectClient(_ client: GameClient, recordLaunch: Bool = true) {
         clientFailure = nil
+        let isNewLogicalLaunch = recordLaunch && countedLaunchClientID != client.id
         if activeLaunchSession?.clientID != client.id {
             finalizeLaunchSession()
+        }
+        if isNewLogicalLaunch {
+            countedLaunchClientID = nil
         }
         reVCDOSServer?.stop()
         reVCDOSServer = nil
@@ -442,7 +472,11 @@ struct ContentView: View {
             }
             reVCDOSServer = server
         }
-        beginLaunchSession(for: client.id)
+        if isNewLogicalLaunch {
+            beginLaunchSession(for: client.id)
+        } else {
+            resumeLaunchSession(for: client.id)
+        }
     }
 
     private func deleteDownloadedAssets() {
@@ -495,7 +529,8 @@ struct ContentView: View {
     private func retryCurrentClient() {
         guard let client = selectedClient else { return }
         webViewIdentity += 1
-        selectClient(client)
+        let shouldRecordLaunch = countedLaunchClientID != client.id
+        selectClient(client, recordLaunch: shouldRecordLaunch)
     }
 
     private func loadClients() {
@@ -524,19 +559,20 @@ struct ContentView: View {
         guard client.isCustom else { return }
         if selectedClient?.id == client.id {
             finalizeLaunchSession()
+            countedLaunchClientID = nil
             reVCDOSServer?.stop()
             reVCDOSServer = nil
             selectedClient = nil
             clientFailure = nil
         }
         CustomClientStore.shared.remove(client)
-        ClientLibraryMetadataStore.shared.remove(clientID: client.id)
         loadClients()
     }
 
     private func quitCurrentClient() {
         hideQuit()
         finalizeLaunchSession()
+        countedLaunchClientID = nil
         let client = selectedClient
         snapshotter.takeSnapshot { image in
             DispatchQueue.main.async {

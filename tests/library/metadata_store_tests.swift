@@ -101,11 +101,105 @@ func testFinalizeSessionRecordsDurationOnce() throws {
     let start = Date(timeIntervalSince1970: 100)
     let end = Date(timeIntervalSince1970: 160)
 
+    store.recordLaunch(clientID: "game-1", at: start)
     var session: ActiveLaunchSession? = ActiveLaunchSession(clientID: "game-1", startedAt: start)
     LaunchSessionTracker.finalize(&session, at: end, store: store)
     LaunchSessionTracker.finalize(&session, at: Date(timeIntervalSince1970: 200), store: store)
 
     let metadata = store.metadata(for: "game-1")
     assert(metadata.totalPlaySeconds == 60)
+    assert(metadata.launchCount == 1)
     assert(session == nil)
+}
+
+func testPauseRecordsSegmentAndKeepsSessionStart() throws {
+    let fileManager = FileManager.default
+    let root = try makeTemporaryStoreRoot()
+    defer { try? fileManager.removeItem(at: root) }
+    let store = ClientLibraryMetadataStore(fileManager: fileManager, baseDirectoryURL: root)
+    let start = Date(timeIntervalSince1970: 100)
+    let failure = Date(timeIntervalSince1970: 160)
+
+    store.recordLaunch(clientID: "game-1", at: start)
+    var session: ActiveLaunchSession? = ActiveLaunchSession(clientID: "game-1", startedAt: start)
+    LaunchSessionTracker.pause(&session, at: failure, store: store)
+
+    let metadata = store.metadata(for: "game-1")
+    assert(metadata.totalPlaySeconds == 60)
+    assert(metadata.launchCount == 1)
+    assert(session?.clientID == "game-1")
+    assert(session?.startedAt == start)
+    assert(session?.recordedPlaySeconds == 60)
+}
+
+func testFailureThenRetryKeepsSessionStartAndLaunchCount() throws {
+    let fileManager = FileManager.default
+    let root = try makeTemporaryStoreRoot()
+    defer { try? fileManager.removeItem(at: root) }
+    let store = ClientLibraryMetadataStore(fileManager: fileManager, baseDirectoryURL: root)
+    let start = Date(timeIntervalSince1970: 100)
+    let failure = Date(timeIntervalSince1970: 160)
+    let retry = Date(timeIntervalSince1970: 170)
+    let quit = Date(timeIntervalSince1970: 200)
+
+    store.recordLaunch(clientID: "game-1", at: start)
+    var session: ActiveLaunchSession? = ActiveLaunchSession(clientID: "game-1", startedAt: start)
+
+    // Failure path: record segment, keep logical launch alive.
+    LaunchSessionTracker.pause(&session, at: failure, store: store)
+
+    // Retry: same logical launch, no new launch count, same session start.
+    LaunchSessionTracker.resume(&session, clientID: "game-1", at: retry, store: store)
+
+    let afterRetry = store.metadata(for: "game-1")
+    assert(afterRetry.launchCount == 1)
+    assert(afterRetry.totalPlaySeconds == 60)
+    assert(session?.clientID == "game-1")
+    assert(session?.startedAt == start)
+
+    // Final quit records only the post-retry segment.
+    LaunchSessionTracker.finalize(&session, at: quit, store: store)
+
+    let metadata = store.metadata(for: "game-1")
+    assert(metadata.launchCount == 1)
+    assert(metadata.totalPlaySeconds == 90)
+    assert(session == nil)
+}
+
+func testFailureThenBackToClientsFinalizesPausedSession() throws {
+    let fileManager = FileManager.default
+    let root = try makeTemporaryStoreRoot()
+    defer { try? fileManager.removeItem(at: root) }
+    let store = ClientLibraryMetadataStore(fileManager: fileManager, baseDirectoryURL: root)
+    let start = Date(timeIntervalSince1970: 100)
+    let failure = Date(timeIntervalSince1970: 160)
+    let back = Date(timeIntervalSince1970: 190)
+
+    store.recordLaunch(clientID: "game-1", at: start)
+    var session: ActiveLaunchSession? = ActiveLaunchSession(clientID: "game-1", startedAt: start)
+
+    LaunchSessionTracker.pause(&session, at: failure, store: store)
+    LaunchSessionTracker.finalize(&session, at: back, store: store)
+
+    let metadata = store.metadata(for: "game-1")
+    assert(metadata.launchCount == 1)
+    assert(metadata.totalPlaySeconds == 60)
+    assert(session == nil)
+}
+
+func testCorruptMetadataFileFallsBackToEmpty() throws {
+    let fileManager = FileManager.default
+    let root = try makeTemporaryStoreRoot()
+    defer { try? fileManager.removeItem(at: root) }
+    let metadataURL = root.appendingPathComponent("library-metadata.json")
+    try Data("not json".utf8).write(to: metadataURL)
+
+    let store = ClientLibraryMetadataStore(fileManager: fileManager, baseDirectoryURL: root)
+
+    assert(store.allMetadata().isEmpty)
+    let metadata = store.metadata(for: "game-1")
+    assert(metadata.systemID == nil)
+    assert(metadata.lastPlayedAt == nil)
+    assert(metadata.launchCount == 0)
+    assert(metadata.totalPlaySeconds == 0)
 }

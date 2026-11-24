@@ -7,6 +7,10 @@ func runTests() throws {
     try testSetSystemIDPersistsAcrossReload()
     try testRemoveDeletesClientMetadata()
     try testFinalizeSessionRecordsDurationOnce()
+    try testPauseRecordsSegmentAndKeepsSessionStart()
+    try testFailureThenRetryKeepsSessionStartAndLaunchCount()
+    try testFailureThenBackToClientsFinalizesPausedSession()
+    try testCorruptMetadataFileFallsBackToEmpty()
 
     try testResolveTypeUsesBundledDefaults()
     try testResolveTypeUsesKnownRetroSystemID()

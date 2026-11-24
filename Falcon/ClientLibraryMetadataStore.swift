@@ -22,6 +22,15 @@ struct ClientLibraryMetadata: Codable, Equatable {
 struct ActiveLaunchSession: Equatable {
     let clientID: String
     let startedAt: Date
+    var recordedPlaySeconds: Double
+    var isPaused: Bool
+
+    init(clientID: String, startedAt: Date, recordedPlaySeconds: Double = 0, isPaused: Bool = false) {
+        self.clientID = clientID
+        self.startedAt = startedAt
+        self.recordedPlaySeconds = recordedPlaySeconds
+        self.isPaused = isPaused
+    }
 }
 
 enum LaunchSessionTracker {
@@ -31,12 +40,53 @@ enum LaunchSessionTracker {
         at date: Date,
         store: ClientLibraryMetadataStore
     ) {
-        if session?.clientID == clientID {
+        if let activeSession = session, activeSession.clientID == clientID, !activeSession.isPaused {
             return
         }
         finalize(&session, at: date, store: store)
         session = ActiveLaunchSession(clientID: clientID, startedAt: date)
         store.recordLaunch(clientID: clientID, at: date)
+    }
+
+    static func resume(
+        _ session: inout ActiveLaunchSession?,
+        clientID: String,
+        at date: Date,
+        store: ClientLibraryMetadataStore
+    ) {
+        if var activeSession = session, activeSession.clientID == clientID {
+            if activeSession.isPaused {
+                activeSession.recordedPlaySeconds = max(0, date.timeIntervalSince(activeSession.startedAt))
+                activeSession.isPaused = false
+                session = activeSession
+            }
+            return
+        }
+        finalize(&session, at: date, store: store)
+        session = ActiveLaunchSession(clientID: clientID, startedAt: date)
+    }
+
+    static func pause(
+        _ session: inout ActiveLaunchSession?,
+        at date: Date,
+        store: ClientLibraryMetadataStore
+    ) {
+        guard var activeSession = session, !activeSession.isPaused else { return }
+        let elapsed = max(0, date.timeIntervalSince(activeSession.startedAt) - activeSession.recordedPlaySeconds)
+        guard elapsed > 0 else {
+            activeSession.isPaused = true
+            session = activeSession
+            return
+        }
+        let segmentStart = activeSession.startedAt.addingTimeInterval(activeSession.recordedPlaySeconds)
+        store.recordSessionEnd(
+            clientID: activeSession.clientID,
+            startedAt: segmentStart,
+            endedAt: segmentStart.addingTimeInterval(elapsed)
+        )
+        activeSession.recordedPlaySeconds += elapsed
+        activeSession.isPaused = true
+        session = activeSession
     }
 
     static func finalize(
@@ -46,10 +96,14 @@ enum LaunchSessionTracker {
     ) {
         guard let activeSession = session else { return }
         session = nil
+        if activeSession.isPaused { return }
+        let elapsed = max(0, date.timeIntervalSince(activeSession.startedAt) - activeSession.recordedPlaySeconds)
+        guard elapsed > 0 else { return }
+        let segmentStart = activeSession.startedAt.addingTimeInterval(activeSession.recordedPlaySeconds)
         store.recordSessionEnd(
             clientID: activeSession.clientID,
-            startedAt: activeSession.startedAt,
-            endedAt: date
+            startedAt: segmentStart,
+            endedAt: segmentStart.addingTimeInterval(elapsed)
         )
     }
 }
@@ -143,7 +197,9 @@ final class ClientLibraryMetadataStore {
             let data = try JSONEncoder().encode(records)
             try data.write(to: metadataURL, options: .atomic)
         } catch {
-            return
+            #if DEBUG
+            print("[ClientLibraryMetadataStore] Failed to save metadata: \(error)")
+            #endif
         }
     }
 }

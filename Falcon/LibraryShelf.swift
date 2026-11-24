@@ -49,7 +49,10 @@ enum LibraryShelfBuilder {
                 return (client, lastPlayedAt)
             }
             .sorted { lhs, rhs in
-                lhs.1 > rhs.1
+                if lhs.1 != rhs.1 { return lhs.1 > rhs.1 }
+                let nameOrder = lhs.0.name.localizedCaseInsensitiveCompare(rhs.0.name)
+                if nameOrder != .orderedSame { return nameOrder == .orderedAscending }
+                return lhs.0.id < rhs.0.id
             }
             .prefix(recentlyPlayedLimit)
             .map(\.0)

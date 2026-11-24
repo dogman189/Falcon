@@ -158,7 +158,7 @@ final class CustomClientStore {
         )
     }
 
-    func remove(_ client: GameClient) {
+    func remove(_ client: GameClient, metadataStore: ClientLibraryMetadataStore = .shared) {
         guard client.isCustom else { return }
         var records = loadRecords()
         if let record = records.first(where: { $0.id == client.id }),
@@ -169,7 +169,7 @@ final class CustomClientStore {
         records.removeAll { $0.id == client.id }
         try? saveRecords(records)
         ClientCoverStore.shared.reset(for: client.id)
-        ClientLibraryMetadataStore.shared.remove(clientID: client.id)
+        metadataStore.remove(clientID: client.id)
     }
 
     private func ensureBaseDirectory() throws {
