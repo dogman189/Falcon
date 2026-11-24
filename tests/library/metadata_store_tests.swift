@@ -92,3 +92,20 @@ func testRemoveDeletesClientMetadata() throws {
     assert(metadata.totalPlaySeconds == 0)
     assert(store.allMetadata()["game-1"] == nil)
 }
+
+func testFinalizeSessionRecordsDurationOnce() throws {
+    let fileManager = FileManager.default
+    let root = try makeTemporaryStoreRoot()
+    defer { try? fileManager.removeItem(at: root) }
+    let store = ClientLibraryMetadataStore(fileManager: fileManager, baseDirectoryURL: root)
+    let start = Date(timeIntervalSince1970: 100)
+    let end = Date(timeIntervalSince1970: 160)
+
+    var session: ActiveLaunchSession? = ActiveLaunchSession(clientID: "game-1", startedAt: start)
+    LaunchSessionTracker.finalize(&session, at: end, store: store)
+    LaunchSessionTracker.finalize(&session, at: Date(timeIntervalSince1970: 200), store: store)
+
+    let metadata = store.metadata(for: "game-1")
+    assert(metadata.totalPlaySeconds == 60)
+    assert(session == nil)
+}

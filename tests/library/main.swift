@@ -6,6 +6,7 @@ func runTests() throws {
     try testRecordSessionEndAccumulatesPlaytime()
     try testSetSystemIDPersistsAcrossReload()
     try testRemoveDeletesClientMetadata()
+    try testFinalizeSessionRecordsDurationOnce()
 
     try testResolveTypeUsesBundledDefaults()
     try testResolveTypeUsesKnownRetroSystemID()

@@ -19,6 +19,41 @@ struct ClientLibraryMetadata: Codable, Equatable {
     }
 }
 
+struct ActiveLaunchSession: Equatable {
+    let clientID: String
+    let startedAt: Date
+}
+
+enum LaunchSessionTracker {
+    static func begin(
+        _ session: inout ActiveLaunchSession?,
+        clientID: String,
+        at date: Date,
+        store: ClientLibraryMetadataStore
+    ) {
+        if session?.clientID == clientID {
+            return
+        }
+        finalize(&session, at: date, store: store)
+        session = ActiveLaunchSession(clientID: clientID, startedAt: date)
+        store.recordLaunch(clientID: clientID, at: date)
+    }
+
+    static func finalize(
+        _ session: inout ActiveLaunchSession?,
+        at date: Date,
+        store: ClientLibraryMetadataStore
+    ) {
+        guard let activeSession = session else { return }
+        session = nil
+        store.recordSessionEnd(
+            clientID: activeSession.clientID,
+            startedAt: activeSession.startedAt,
+            endedAt: date
+        )
+    }
+}
+
 final class ClientLibraryMetadataStore {
     static let shared = ClientLibraryMetadataStore()
 

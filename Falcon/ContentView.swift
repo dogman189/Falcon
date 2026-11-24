@@ -18,6 +18,7 @@ struct ContentView: View {
 
     @EnvironmentObject private var settings: AppSettings
     @State private var selectedClient: GameClient?
+    @State private var activeLaunchSession: ActiveLaunchSession?
     @State private var quitRevealed = false
     @State private var quitHideTask: Task<Void, Never>?
     @State private var clientFailure: String?
@@ -132,11 +133,12 @@ struct ContentView: View {
         .preferredColorScheme(settings.appTheme.preferredColorScheme)
         .onChange(of: selectedClient) { _, newClient in
             hideQuit()
-            if selectedClient == nil {
+            if newClient == nil {
+                finalizeLaunchSession()
                 reVCDOSServer?.stop()
                 reVCDOSServer = nil
             }
-            OrientationLock.shared.mode = (selectedClient == nil) ? .auto : .landscapeOnly
+            OrientationLock.shared.mode = (newClient == nil) ? .auto : .landscapeOnly
             GameControllerManager.shared.isEnabled = (newClient == nil)
         }
         .task {
@@ -270,6 +272,23 @@ struct ContentView: View {
         quitRevealed = false
     }
 
+    private func beginLaunchSession(for clientID: String) {
+        LaunchSessionTracker.begin(
+            &activeLaunchSession,
+            clientID: clientID,
+            at: Date(),
+            store: .shared
+        )
+    }
+
+    private func finalizeLaunchSession() {
+        LaunchSessionTracker.finalize(
+            &activeLaunchSession,
+            at: Date(),
+            store: .shared
+        )
+    }
+
     private func failureView(title: String, message: String) -> some View {
         VStack(spacing: 18) {
             Image(systemName: "exclamationmark.triangle.fill")
@@ -291,6 +310,7 @@ struct ContentView: View {
                 .buttonStyle(.borderedProminent)
 
                 Button("Back to clients") {
+                    finalizeLaunchSession()
                     clientFailure = nil
                     selectedClient = nil
                 }
@@ -382,6 +402,9 @@ struct ContentView: View {
 
     private func selectClient(_ client: GameClient) {
         clientFailure = nil
+        if activeLaunchSession?.clientID != client.id {
+            finalizeLaunchSession()
+        }
         reVCDOSServer?.stop()
         reVCDOSServer = nil
         // Set the client first so a pre-flight failure still has context for
@@ -412,6 +435,7 @@ struct ContentView: View {
             }
             reVCDOSServer = server
         }
+        beginLaunchSession(for: client.id)
     }
 
     private func deleteDownloadedAssets() {
@@ -491,6 +515,7 @@ struct ContentView: View {
     private func removeCustomClient(_ client: GameClient) {
         guard client.isCustom else { return }
         if selectedClient?.id == client.id {
+            finalizeLaunchSession()
             reVCDOSServer?.stop()
             reVCDOSServer = nil
             selectedClient = nil
@@ -502,6 +527,7 @@ struct ContentView: View {
 
     private func quitCurrentClient() {
         hideQuit()
+        finalizeLaunchSession()
         let client = selectedClient
         snapshotter.takeSnapshot { image in
             DispatchQueue.main.async {
