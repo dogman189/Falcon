@@ -123,11 +123,18 @@ struct ContentView: View {
                         Label("Packer", systemImage: "shippingbox")
                     }
 
-                    SettingsView()
-                        .tag(AppTab.settings)
-                        .tabItem {
-                            Label("Settings", systemImage: "gearshape")
+                    SettingsView(
+                        isActiveTab: selectedTab == .settings,
+                        onReturnToLibrary: {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                selectedTab = .library
+                            }
                         }
+                    )
+                    .tag(AppTab.settings)
+                    .tabItem {
+                        Label("Settings", systemImage: "gearshape")
+                    }
                 }
                 .tint(settings.appTheme.primaryText)
                 .toolbarBackground(settings.backgroundColor, for: .tabBar)
