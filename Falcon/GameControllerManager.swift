@@ -29,6 +29,7 @@ final class GameControllerManager: ObservableObject {
     var onActionX: (() -> Void)? // Add Game
     var onShoulderLeft: (() -> Void)? // L1 / LB (Previous Tab)
     var onShoulderRight: (() -> Void)? // R1 / RB (Next Tab)
+    var onInGameMenuToggle: (() -> Void)? // Guide/Home button while in-game
 
     private var cancellables = Set<AnyCancellable>()
     private var lastThumbstickMoveTime: Date = .distantPast
@@ -170,6 +171,12 @@ final class GameControllerManager: ObservableObject {
                 Task { @MainActor in self?.handleShoulderRight() }
             }
         }
+
+        gamepad.buttonHome?.pressedChangedHandler = { [weak self] _, _, pressed in
+            if pressed {
+                Task { @MainActor in self?.handleInGameMenuToggle() }
+            }
+        }
     }
 
     private func configureMicroGamepad(_ micro: GCMicroGamepad) {
@@ -246,6 +253,11 @@ final class GameControllerManager: ObservableObject {
     private func handleShoulderRight() {
         guard isEnabled else { return }
         onShoulderRight?()
+    }
+
+    private func handleInGameMenuToggle() {
+        guard !isEnabled else { return }
+        onInGameMenuToggle?()
     }
 
     private func cleanControllerName(_ name: String) -> String {
