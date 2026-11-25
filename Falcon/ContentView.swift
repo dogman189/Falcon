@@ -76,6 +76,7 @@ struct ContentView: View {
                         if clientFailure == nil {
                             pauseLaunchSession()
                         }
+                        hideQuickMenu()
                         clientFailure = message
                     }
                     .id(webViewIdentity)
@@ -104,6 +105,19 @@ struct ContentView: View {
 
                             if quickMenuVisible {
                                 quickMenuCard
+                            }
+
+                            if let screenshotFeedback {
+                                Text(screenshotFeedback)
+                                    .font(.caption2.weight(.medium))
+                                    .foregroundStyle(.white.opacity(0.9))
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 6)
+                                    .background(Color.black.opacity(0.55), in: Capsule())
+                                    .padding(.leading, 24)
+                                    .padding(.top, quickMenuVisible ? 190 : 8)
+                                    .transition(.opacity)
+                                    .allowsHitTesting(false)
                             }
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -284,14 +298,6 @@ struct ContentView: View {
             quickMenuButton("Quit", role: .destructive) {
                 quitCurrentClient()
             }
-
-            if let screenshotFeedback {
-                Text(screenshotFeedback)
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(.white.opacity(0.85))
-                    .padding(.horizontal, 4)
-                    .transition(.opacity)
-            }
         }
         .padding(10)
         .background(Color.black.opacity(0.45), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -325,6 +331,9 @@ struct ContentView: View {
     }
 
     private func showQuickMenu(autoHide: Bool = true) {
+        screenshotFeedbackTask?.cancel()
+        screenshotFeedbackTask = nil
+        screenshotFeedback = nil
         withAnimation(.easeInOut(duration: 0.15)) {
             quickMenuVisible = true
         }
@@ -348,6 +357,7 @@ struct ContentView: View {
         quickMenuHideTask?.cancel()
         quickMenuHideTask = Task {
             try? await Task.sleep(nanoseconds: 5_000_000_000)
+            // Ignore sleep cancellation; only skip hide if this task was replaced/cancelled.
             guard !Task.isCancelled else { return }
             await MainActor.run {
                 withAnimation(.easeInOut(duration: 0.15)) {
@@ -364,15 +374,21 @@ struct ContentView: View {
     }
 
     private func captureScreenshot() {
+        quickMenuHideTask?.cancel()
+        quickMenuHideTask = nil
         snapshotter.takeSnapshot { image in
             Task { @MainActor in
                 guard let image else {
                     showScreenshotFeedback("Screenshot failed")
-                    scheduleQuickMenuAutoHide()
+                    if quickMenuVisible {
+                        scheduleQuickMenuAutoHide()
+                    }
                     return
                 }
                 await saveScreenshotToPhotos(image)
-                scheduleQuickMenuAutoHide()
+                if quickMenuVisible {
+                    scheduleQuickMenuAutoHide()
+                }
             }
         }
     }
