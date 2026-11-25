@@ -7,6 +7,7 @@
 
 import SwiftUI
 import PhotosUI
+import Photos
 import UniformTypeIdentifiers
 
 struct ContentView: View {
@@ -20,8 +21,11 @@ struct ContentView: View {
     @State private var selectedClient: GameClient?
     @State private var activeLaunchSession: ActiveLaunchSession?
     @State private var countedLaunchClientID: String?
-    @State private var quitRevealed = false
-    @State private var quitHideTask: Task<Void, Never>?
+    @State private var quickMenuVisible = false
+    @State private var quickMenuHideTask: Task<Void, Never>?
+    @State private var webReloadToken = UUID()
+    @State private var screenshotFeedback: String?
+    @State private var screenshotFeedbackTask: Task<Void, Never>?
     @State private var clientFailure: String?
     @State private var customClients: [GameClient] = []
     @State private var libraryRevision = 0
@@ -65,6 +69,7 @@ struct ContentView: View {
                     EaglerWebView(
                         content: webContent,
                         snapshotter: snapshotter,
+                        reloadToken: webReloadToken,
                         webScale: settings.webScale,
                         backgroundUIColor: settings.backgroundUIColor
                     ) { message in
@@ -78,20 +83,30 @@ struct ContentView: View {
                     .background(settings.backgroundColor)
                     .overlay(alignment: .topLeading) {
                         ZStack(alignment: .topLeading) {
+                            if quickMenuVisible {
+                                Color.clear
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                    .contentShape(Rectangle())
+                                    .onTapGesture {
+                                        hideQuickMenu()
+                                    }
+                            }
+
                             Color.clear
                                 .frame(width: 140, height: 90)
                                 .contentShape(Rectangle())
                                 .gesture(
                                     DragGesture(minimumDistance: 20)
                                         .onEnded { _ in
-                                            toggleQuitReveal()
+                                            toggleQuickMenu()
                                         }
                                 )
 
-                            if quitRevealed {
-                                quitButton
+                            if quickMenuVisible {
+                                quickMenuCard
                             }
                         }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     }
                 } else {
                     failureView(
@@ -147,7 +162,11 @@ struct ContentView: View {
         }
         .preferredColorScheme(settings.appTheme.preferredColorScheme)
         .onChange(of: selectedClient) { _, newClient in
-            hideQuit()
+            hideQuickMenu()
+            GameControllerManager.shared.isEnabled = (newClient == nil)
+            GameControllerManager.shared.onInGameMenuToggle = newClient == nil ? nil : {
+                toggleQuickMenu()
+            }
             if newClient == nil {
                 finalizeLaunchSession()
                 countedLaunchClientID = nil
@@ -155,7 +174,6 @@ struct ContentView: View {
                 reVCDOSServer = nil
             }
             OrientationLock.shared.mode = (newClient == nil) ? .auto : .landscapeOnly
-            GameControllerManager.shared.isEnabled = (newClient == nil)
         }
         .task {
             loadClients()
@@ -252,48 +270,146 @@ struct ContentView: View {
         }
     }
 
-    private var quitButton: some View {
-        Button {
-            quitCurrentClient()
-        } label: {
-            Text("Quit")
-                .font(.subheadline.weight(.semibold))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
+    private var quickMenuCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            quickMenuButton("Resume") {
+                hideQuickMenu()
+            }
+            quickMenuButton("Reload") {
+                reloadCurrentClient()
+            }
+            quickMenuButton("Screenshot") {
+                captureScreenshot()
+            }
+            quickMenuButton("Quit", role: .destructive) {
+                quitCurrentClient()
+            }
+
+            if let screenshotFeedback {
+                Text(screenshotFeedback)
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .padding(.horizontal, 4)
+                    .transition(.opacity)
+            }
         }
-        .background(Color.black.opacity(0.25))
-        .clipShape(Capsule())
-        .foregroundStyle(.white.opacity(0.9))
+        .padding(10)
+        .background(Color.black.opacity(0.45), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
+        }
+        .foregroundStyle(.white.opacity(0.95))
         .padding(.leading, 24)
         .padding(.top, 8)
     }
 
-    private func toggleQuitReveal() {
-        withAnimation(.easeInOut(duration: 0.15)) {
-            quitRevealed.toggle()
+    private func quickMenuButton(_ title: String, role: ButtonRole? = nil, action: @escaping () -> Void) -> some View {
+        Button(role: role, action: action) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
         }
-        if quitRevealed {
-            scheduleQuitAutoHide()
+        .buttonStyle(.plain)
+        .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    private func toggleQuickMenu() {
+        if quickMenuVisible {
+            hideQuickMenu()
         } else {
-            quitHideTask?.cancel()
+            showQuickMenu()
         }
     }
 
-    private func scheduleQuitAutoHide() {
-        quitHideTask?.cancel()
-        quitHideTask = Task {
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
+    private func showQuickMenu(autoHide: Bool = true) {
+        withAnimation(.easeInOut(duration: 0.15)) {
+            quickMenuVisible = true
+        }
+        if autoHide {
+            scheduleQuickMenuAutoHide()
+        } else {
+            quickMenuHideTask?.cancel()
+            quickMenuHideTask = nil
+        }
+    }
+
+    private func hideQuickMenu() {
+        quickMenuHideTask?.cancel()
+        quickMenuHideTask = nil
+        withAnimation(.easeInOut(duration: 0.15)) {
+            quickMenuVisible = false
+        }
+    }
+
+    private func scheduleQuickMenuAutoHide() {
+        quickMenuHideTask?.cancel()
+        quickMenuHideTask = Task {
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
             guard !Task.isCancelled else { return }
-            withAnimation(.easeInOut(duration: 0.15)) {
-                quitRevealed = false
+            await MainActor.run {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    quickMenuVisible = false
+                }
             }
         }
     }
 
-    private func hideQuit() {
-        quitHideTask?.cancel()
-        quitHideTask = nil
-        quitRevealed = false
+    private func reloadCurrentClient() {
+        clientFailure = nil
+        webReloadToken = UUID()
+        hideQuickMenu()
+    }
+
+    private func captureScreenshot() {
+        snapshotter.takeSnapshot { image in
+            Task { @MainActor in
+                guard let image else {
+                    showScreenshotFeedback("Screenshot failed")
+                    scheduleQuickMenuAutoHide()
+                    return
+                }
+                await saveScreenshotToPhotos(image)
+                scheduleQuickMenuAutoHide()
+            }
+        }
+    }
+
+    @MainActor
+    private func saveScreenshotToPhotos(_ image: UIImage) async {
+        let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+        guard status == .authorized || status == .limited else {
+            showScreenshotFeedback("Photos access denied")
+            return
+        }
+
+        do {
+            try await PHPhotoLibrary.shared().performChanges {
+                PHAssetChangeRequest.creationRequestForAsset(from: image)
+            }
+            showScreenshotFeedback("Saved to Photos")
+        } catch {
+            showScreenshotFeedback("Save failed")
+        }
+    }
+
+    @MainActor
+    private func showScreenshotFeedback(_ message: String) {
+        screenshotFeedbackTask?.cancel()
+        withAnimation(.easeInOut(duration: 0.15)) {
+            screenshotFeedback = message
+        }
+        screenshotFeedbackTask = Task {
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    screenshotFeedback = nil
+                }
+            }
+        }
     }
 
     private func beginLaunchSession(for clientID: String) {
@@ -643,7 +759,7 @@ struct ContentView: View {
     }
 
     private func quitCurrentClient() {
-        hideQuit()
+        hideQuickMenu()
         finalizeLaunchSession()
         countedLaunchClientID = nil
         let client = selectedClient
