@@ -24,6 +24,7 @@ enum FalconWebContent {
 struct EaglerWebView: UIViewRepresentable {
     let content: FalconWebContent
     var snapshotter: WebViewSnapshotter?
+    var reloadToken: UUID = UUID()
     var webScale: Double = 1.0
     var backgroundUIColor: UIColor = UIColor(red: 11 / 255, green: 20 / 255, blue: 38 / 255, alpha: 1)
     var onFailure: (String) -> Void
@@ -58,6 +59,7 @@ struct EaglerWebView: UIViewRepresentable {
 
         snapshotter?.webView = webView
         webView.pageZoom = webScale
+        context.coordinator.lastReloadToken = reloadToken
         loadContent(in: webView)
         return webView
     }
@@ -70,6 +72,10 @@ struct EaglerWebView: UIViewRepresentable {
         if uiView.backgroundColor != backgroundUIColor {
             uiView.backgroundColor = backgroundUIColor
             uiView.scrollView.backgroundColor = backgroundUIColor
+        }
+        if context.coordinator.lastReloadToken != reloadToken {
+            context.coordinator.lastReloadToken = reloadToken
+            uiView.reload()
         }
     }
 
@@ -108,6 +114,7 @@ struct EaglerWebView: UIViewRepresentable {
     final class Coordinator: NSObject, WKNavigationDelegate {
         private let onFailure: (String) -> Void
         private var reportedFailure = false
+        var lastReloadToken: UUID?
 
         init(onFailure: @escaping (String) -> Void) {
             self.onFailure = onFailure
