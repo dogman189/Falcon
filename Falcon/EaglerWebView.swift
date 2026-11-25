@@ -22,9 +22,11 @@ enum FalconWebContent {
 
 /// Immersive wrapper that loads a selected bundled client in a browser-chrome-free WKWebView.
 struct EaglerWebView: UIViewRepresentable {
+    private static let defaultReloadToken = UUID()
+
     let content: FalconWebContent
     var snapshotter: WebViewSnapshotter?
-    var reloadToken: UUID = UUID()
+    var reloadToken: UUID = defaultReloadToken
     var webScale: Double = 1.0
     var backgroundUIColor: UIColor = UIColor(red: 11 / 255, green: 20 / 255, blue: 38 / 255, alpha: 1)
     var onFailure: (String) -> Void
@@ -75,6 +77,7 @@ struct EaglerWebView: UIViewRepresentable {
         }
         if context.coordinator.lastReloadToken != reloadToken {
             context.coordinator.lastReloadToken = reloadToken
+            context.coordinator.resetFailureReporting()
             uiView.reload()
         }
     }
@@ -118,6 +121,10 @@ struct EaglerWebView: UIViewRepresentable {
 
         init(onFailure: @escaping (String) -> Void) {
             self.onFailure = onFailure
+        }
+
+        func resetFailureReporting() {
+            reportedFailure = false
         }
 
         func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
